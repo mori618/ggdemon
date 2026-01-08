@@ -149,7 +149,6 @@ window.confirmCommand = () => {
     gameState.isProc = true;
     sound.playSE('ready');
     document.getElementById('command-wrapper').classList.add('ui-hidden');
-    document.getElementById('btn-ready').classList.add('hidden');
     setMessage("BATTLE!!");
     showCommandDetail(null);
     setTimeout(() => executeTurn(gameState.selectedCmd, getCpuMove()), 300);
@@ -188,5 +187,6 @@ function startTower() {
 
 function startGame() {
     sound.playSE('ready');
+    document.getElementById('select-screen').classList.add('hidden');
     setupBattleState();
 }

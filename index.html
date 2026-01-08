@@ -16,10 +16,10 @@
     <div id="title-screen" class="fixed inset-0 z-[200] flex flex-col items-center justify-center p-6 bg-slate-950">
         <div class="flex flex-col items-center mb-10 text-center text-white">
             <h1
-                class="font-orbitron text-5xl md:text-7xl font-black italic bg-gradient-to-r from-emerald-400 via-sky-400 to-rose-400 bg-clip-text text-transparent title-glow uppercase">
+                class="font-orbitron text-5xl md:text-7xl font-black italic bg-gradient-to-r from-emerald-400 via-sky-400 to-rose-400 bg-clip-text text-transparent title-glow uppercase px-4">
                 G.G</h1>
             <h1
-                class="font-orbitron text-6xl md:text-8xl font-black italic bg-gradient-to-r from-rose-400 via-sky-400 to-emerald-400 bg-clip-text text-transparent title-glow uppercase">
+                class="font-orbitron text-6xl md:text-8xl font-black italic bg-gradient-to-r from-rose-400 via-sky-400 to-emerald-400 bg-clip-text text-transparent title-glow uppercase px-4">
                 Demon</h1>
             <p class="mt-4 font-orbitron text-slate-600 font-bold tracking-[0.5em] text-xs uppercase text-slate-500">
                 Master Edition</p>
@@ -197,6 +197,7 @@
                     </div>
                 </div>
             </div>
+
             <div id="player-effects-display" class="flex gap-2 mt-2 h-6"></div>
             <div class="status-info-bar text-white"><i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i><span
                     id="player-chge-val">1</span>
@@ -210,15 +211,14 @@
                 class="text-[10px] md:text-xs font-black text-blue-400 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">PLAYER</span>
         </div>
 
-        <div class="flex flex-col items-center justify-center z-20 w-1/4 h-full relative text-slate-800">
+        <div
+            class="flex flex-col items-center justify-center z-20 w-1/4 h-full relative text-slate-800 pointer-events-none">
+            <!-- コマンド詳細 -->
             <div id="command-detail-view"
-                class="absolute top-1/2 -translate-y-3/4 w-full flex items-center justify-center pointer-events-none z-50">
-            </div>
-            <div id="vs-label" class="font-orbitron text-2xl font-black italic">VS</div>
-            <div id="battle-view" class="opacity-0 transition-all">
-                <div id="battle-result-content"></div>
-            </div>
+                class="absolute top-1/2 -translate-y-3/4 w-full flex items-center justify-center z-50"></div>
         </div>
+
+
 
         <!-- CPU -->
         <div class="flex flex-col items-center w-1/3">
@@ -231,6 +231,7 @@
                         <div id="cpu-hp-bar" class="hp-fill h-full bg-rose-500 w-full"></div>
                     </div>
                 </div>
+
                 <div id="cpu-level-badge"
                     class="absolute -bottom-2 -right-2 bg-rose-600 text-white text-[8px] font-black px-2 py-0.5 rounded italic font-orbitron hidden uppercase tracking-widest">
                     LV.1</div>
@@ -256,9 +257,17 @@
                 <p id="game-message"
                     class="text-white font-black text-xl font-orbitron italic tracking-widest uppercase"></p>
             </div>
-            <button id="btn-ready" onclick="confirmCommand()" disabled
-                class="ready-btn w-64 py-4 mb-4 bg-white text-slate-950 rounded-2xl font-black text-xl uppercase shadow-2xl transition-all active:scale-95 disabled:opacity-0 disabled:pointer-events-none uppercase tracking-widest text-black font-orbitron">Ready</button>
-            <div class="flex space-x-3 items-end mb-4">
+
+            <!-- Ready Button (Restored) -->
+            <div class="w-full flex justify-center mb-2">
+                <button id="btn-ready" onclick="confirmCommand()" disabled
+                    class="ready-btn w-64 py-3 bg-white text-slate-950 rounded-xl font-black text-xl uppercase shadow-[0_0_20px_rgba(255,255,255,0.4)] transition-all active:scale-95 disabled:opacity-0 disabled:pointer-events-none font-orbitron tracking-widest hover:bg-slate-200">
+                    Ready
+                </button>
+            </div>
+
+            <!-- コマンドエリア -->
+            <div class="flex space-x-3 items-end mb-4 pt-4">
                 <button id="cmd-CHARGE" onclick="selectCommand('CHARGE')" class="command-btn btn-charge"><span
                         class="stat-badge" id="badge-charge-val">0</span><i data-lucide="zap" class="w-8 h-8"></i><span
                         class="effect-label" id="eff-charge">+1</span></button>
@@ -266,12 +275,13 @@
                         class="stat-badge" id="badge-attack-val">1</span><i data-lucide="sword"
                         class="w-8 h-8"></i><span class="effect-label" id="eff-attack">1 DMG</span></button>
                 <button id="cmd-GUARD" onclick="selectCommand('GUARD')" class="command-btn btn-guard"><span
-                        class="stat-badge" id="badge-charge-val">0</span><i data-lucide="shield"
+                        class="stat-badge" id="badge-guard-val">0</span><i data-lucide="shield"
                         class="w-8 h-8"></i><span class="effect-label" id="eff-guard">BLOCK</span></button>
                 <button id="cmd-SKILL" onclick="selectCommand('SKILL')" class="command-btn btn-skill"><span
                         class="stat-badge" id="badge-skill-val">?</span><i data-lucide="star" class="w-8 h-8"></i><span
                         class="effect-label" id="eff-skill">SKILL</span></button>
             </div>
+
             <div class="mt-2 font-orbitron text-[10px] font-black text-slate-700 tracking-[0.2em]">TURN <span
                     id="turn-display">1</span></div>
         </div>
@@ -296,6 +306,12 @@
             <button onclick="restartApp()"
                 class="w-full bg-white text-slate-950 py-4 rounded-xl font-black uppercase text-lg active:scale-95 transition-all">タイトルへ戻る</button>
         </div>
+    </div>
+
+    <!-- Battle Dialog Overlay -->
+    <div id="battle-dialog-overlay"
+        class="fixed inset-0 z-[100] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <!-- Content injected by JS -->
     </div>
 
     <!-- Treasure Chest Overlay -->

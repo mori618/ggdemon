@@ -101,6 +101,8 @@ export function setupBattleState() {
 
     initEnergy();
     updateUI();
+    document.getElementById('command-wrapper').classList.remove('ui-hidden');
+    document.getElementById('btn-ready').classList.remove('hidden');
     setMessage(isBoss ? "WARNING: BOSS ENCOUNTER" : "Command Select");
     lucide.createIcons();
 }
@@ -132,12 +134,35 @@ export function executeTurn(pM, cM) {
     gameState.playerHistory.push(pM);
     if (gameState.playerHistory.length > 5) gameState.playerHistory.shift();
 
-    // UI Reveal
-    const view = document.getElementById('battle-view'), content = document.getElementById('battle-result-content'), pC = document.getElementById('player-card'), cC = document.getElementById('cpu-card');
-    document.getElementById('vs-label').style.opacity = '0'; pC.classList.add('zone-dim'); cC.classList.add('zone-dim');
+    // UI Reveal (Dialog)
+    const dialogOverlay = document.getElementById('battle-dialog-overlay');
+    const pC = document.getElementById('player-card'), cC = document.getElementById('cpu-card');
+
+    // Dim cards
+    pC.classList.add('zone-dim'); cC.classList.add('zone-dim');
+
     const icons = { 'ATTACK': 'sword', 'CHARGE': 'zap', 'GUARD': 'shield', 'SKILL': 'star' };
-    content.innerHTML = `<div class="battle-dialog battle-reveal"><div class="flex flex-col items-center font-orbitron text-blue-400"><i data-lucide="${icons[pM]}" class="w-12 h-12 md:w-16 md:h-16"></i><span class="text-[10px] mt-1 font-black uppercase">${pM}</span></div><div class="text-white font-orbitron italic opacity-20 text-2xl px-2 uppercase">VS</div><div class="flex flex-col items-center font-orbitron text-rose-500" style="animation-delay: 0.1s"><i data-lucide="${icons[cM]}" class="w-12 h-12 md:w-16 md:h-16"></i><span class="text-[10px] mt-1 font-black uppercase">${cM}</span></div></div>`;
-    lucide.createIcons(); view.classList.replace('opacity-0', 'opacity-100');
+
+    // Inject Dialog Content
+    dialogOverlay.innerHTML = `
+        <div class="battle-dialog-card battle-reveal">
+            <div class="action-icon-box">
+                <i data-lucide="${icons[pM]}" class="w-12 h-12 md:w-16 md:h-16 text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.8)]"></i>
+                <span class="text-[10px] font-black font-orbitron text-blue-200 tracking-widest uppercase">${pM}</span>
+            </div>
+            <div class="font-orbitron text-3xl font-black italic text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] px-2">VS</div>
+            <div class="action-icon-box">
+                <i data-lucide="${icons[cM]}" class="w-12 h-12 md:w-16 md:h-16 text-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]"></i>
+                <span class="text-[10px] font-black font-orbitron text-rose-300 tracking-widest uppercase">${cM}</span>
+            </div>
+        </div>
+    `;
+
+    lucide.createIcons();
+    dialogOverlay.classList.remove('hidden');
+    setTimeout(() => dialogOverlay.classList.remove('opacity-0'), 10);
+
+    // Hide Ready Button (controlled by disabled state in UI)
 
     setTimeout(() => {
         // 2. Calculate Result
@@ -165,7 +190,8 @@ export function executeTurn(pM, cM) {
         if (result.cDmgTaken > 0) cC.classList.add('shake');
 
         updateUI();
-        view.classList.replace('opacity-100', 'opacity-0'); document.getElementById('vs-label').style.opacity = '1'; pC.classList.remove('zone-dim'); cC.classList.remove('zone-dim');
+        updateUI();
+        pC.classList.remove('zone-dim'); cC.classList.remove('zone-dim');
 
         setTimeout(() => {
             pC.classList.remove('shake'); cC.classList.remove('shake');
@@ -173,8 +199,13 @@ export function executeTurn(pM, cM) {
             if (gameState.pHP <= 0 || gameState.cHP <= 0 || gameState.pEnergy >= gameState.player.winE || cWinF) showFinal(cWinF);
             else {
                 gameState.turn++; gameState.isProc = false; gameState.selectedCmd = null;
+
+                // Hide Dialog
+                dialogOverlay.classList.add('opacity-0');
+                setTimeout(() => dialogOverlay.classList.add('hidden'), 300);
+
                 document.getElementById('command-wrapper').classList.remove('ui-hidden');
-                document.getElementById('btn-ready').classList.remove('hidden');
+
                 updateUI();
                 setMessage("Command Select");
             }
