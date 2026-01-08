@@ -1,0 +1,343 @@
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS } from './constants.js';
+import { gameState, saveHighStreak } from './utils.js';
+import { sound } from './sounds.js';
+import { setMessage, updateUI, initEnergy } from './ui.js';
+import { calculateTurnResult, updateEffects, getCpuMoveLogic } from './logic.js';
+
+export function setupBattleState() {
+    gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
+    gameState.player.effects = [];
+    gameState.player.tempAtk = gameState.player.tempGrdC = gameState.player.tempChgE = gameState.player.tempChgC = gameState.player.tempDmgReduce = 0;
+
+    const isBoss = (gameState.gameMode === 'tower' && gameState.floor % 5 === 0);
+    let baseCpu;
+
+    if (gameState.gameMode === 'tower') {
+        if (isBoss) {
+            baseCpu = JSON.parse(JSON.stringify(BOSS_CHARACTERS[Math.floor(Math.random() * BOSS_CHARACTERS.length)]));
+        } else {
+            baseCpu = JSON.parse(JSON.stringify(CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]));
+        }
+    } else {
+        baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
+    }
+
+    gameState.cpu = JSON.parse(JSON.stringify(baseCpu));
+    gameState.cpu.effects = [];
+    gameState.cpu.tempAtk = gameState.cpu.tempGrdC = gameState.cpu.tempChgE = gameState.cpu.tempChgC = gameState.cpu.tempDmgReduce = 0;
+
+    document.getElementById('cmd-SKILL').classList.toggle('hidden', gameState.gameMode !== 'tower');
+    document.getElementById('tower-indicator').classList.toggle('hidden', gameState.gameMode !== 'tower');
+
+    const badge = document.getElementById('cpu-level-badge');
+    badge.classList.remove('bg-purple-600', 'animate-pulse', 'bg-slate-700', 'bg-rose-600');
+
+    if (gameState.gameMode === 'tower') {
+        document.getElementById('current-floor-val').innerText = gameState.floor;
+        const bossIn = 5 - ((gameState.floor - 1) % 5);
+        document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : bossIn;
+
+        if (isBoss) {
+            gameState.cpu.hp += Math.floor(gameState.floor / 2);
+            gameState.cpu.atk += Math.floor(gameState.floor / 10);
+            badge.innerText = `BOSS`;
+            badge.classList.add('bg-purple-600', 'animate-pulse');
+        } else {
+            const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
+            gameState.cpu.name = trait.name + gameState.cpu.name;
+            gameState.cpu.hp = Math.max(1, gameState.cpu.hp + (trait.hp || 0));
+            gameState.cpu.atk = Math.max(1, gameState.cpu.atk + (trait.atk || 0));
+            gameState.cpu.chgE = Math.max(1, gameState.cpu.chgE + (trait.chgE || 0));
+            gameState.cpu.winE = Math.max(3, gameState.cpu.winE + (trait.winE || 0));
+            gameState.cpu.grdC = Math.max(0, gameState.cpu.grdC + (trait.grdC || 0));
+            gameState.cpu.atkC = Math.max(0, gameState.cpu.atkC + (trait.atkC || 0));
+            gameState.cpu.startE = Math.max(0, gameState.cpu.startE + (trait.startE || 0));
+            gameState.cpu.tagline = trait.tagline;
+
+            const floorBoost = Math.floor(gameState.floor / 5);
+            gameState.cpu.hp += floorBoost;
+            badge.innerText = `FLOOR ${gameState.floor}`;
+            badge.classList.add('bg-slate-700');
+        }
+        badge.classList.remove('hidden');
+    } else {
+        gameState.playerSkill = null;
+        badge.innerText = gameState.aiLevel;
+        badge.classList.add('bg-rose-600');
+        badge.classList.remove('hidden');
+    }
+
+    gameState.pHP = gameState.player.hp;
+    gameState.cHP = gameState.cpu.hp;
+    gameState.pEnergy = gameState.player.startE;
+    gameState.cEnergy = gameState.cpu.startE;
+    gameState.turn = 1; gameState.selectedCmd = null; gameState.isProc = false; gameState.gameOver = false;
+
+    document.getElementById('player-name-label').innerText = gameState.player.name;
+    document.getElementById('cpu-name-label').innerText = gameState.cpu.name;
+    document.getElementById('player-icon-container').innerHTML = `<i data-lucide="${gameState.player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+    document.getElementById('cpu-icon-container').innerHTML = `<i data-lucide="${gameState.cpu.icon}" class="w-16 h-16 md:w-20 md:h-20 ${isBoss ? 'text-purple-500' : 'text-rose-500/50'}"></i>`;
+
+    initEnergy();
+    updateUI();
+    setMessage(isBoss ? "WARNING: BOSS ENCOUNTER" : "Command Select");
+    lucide.createIcons();
+}
+
+export function getCpuMove() {
+    return getCpuMoveLogic({
+        player: gameState.player,
+        cpu: gameState.cpu,
+        pEnergy: gameState.pEnergy,
+        cEnergy: gameState.cEnergy,
+        aiLevel: gameState.aiLevel,
+        gameMode: gameState.gameMode,
+        floor: gameState.floor,
+        cHP: gameState.cHP,
+        pHP: gameState.pHP
+    });
+}
+
+export function executeTurn(pM, cM) {
+    // 1. Update Effects
+    const pUpdate = updateEffects(gameState.player.effects);
+    gameState.player.effects = pUpdate.effects;
+    Object.assign(gameState.player, pUpdate.totals);
+
+    const cUpdate = updateEffects(gameState.cpu.effects);
+    gameState.cpu.effects = cUpdate.effects;
+    Object.assign(gameState.cpu, cUpdate.totals);
+
+    gameState.playerHistory.push(pM);
+    if (gameState.playerHistory.length > 5) gameState.playerHistory.shift();
+
+    // UI Reveal
+    const view = document.getElementById('battle-view'), content = document.getElementById('battle-result-content'), pC = document.getElementById('player-card'), cC = document.getElementById('cpu-card');
+    document.getElementById('vs-label').style.opacity = '0'; pC.classList.add('zone-dim'); cC.classList.add('zone-dim');
+    const icons = { 'ATTACK': 'sword', 'CHARGE': 'zap', 'GUARD': 'shield', 'SKILL': 'star' };
+    content.innerHTML = `<div class="battle-dialog battle-reveal"><div class="flex flex-col items-center font-orbitron text-blue-400"><i data-lucide="${icons[pM]}" class="w-12 h-12 md:w-16 md:h-16"></i><span class="text-[10px] mt-1 font-black uppercase">${pM}</span></div><div class="text-white font-orbitron italic opacity-20 text-2xl px-2 uppercase">VS</div><div class="flex flex-col items-center font-orbitron text-rose-500" style="animation-delay: 0.1s"><i data-lucide="${icons[cM]}" class="w-12 h-12 md:w-16 md:h-16"></i><span class="text-[10px] mt-1 font-black uppercase">${cM}</span></div></div>`;
+    lucide.createIcons(); view.classList.replace('opacity-0', 'opacity-100');
+
+    setTimeout(() => {
+        // 2. Calculate Result
+        const result = calculateTurnResult(
+            { ...gameState.player, energy: gameState.pEnergy },
+            { ...gameState.cpu, energy: gameState.cEnergy },
+            pM, cM, gameState.playerSkill
+        );
+
+        // Sound effects
+        if (pM === 'CHARGE') sound.playSE('charge');
+        if (pM === 'ATTACK') sound.playSE('attack');
+        if (pM === 'GUARD') sound.playSE('guard');
+        if (result.pDmgTaken > 0 || result.cDmgTaken > 0) sound.playSE('clash');
+
+        // Apply results
+        gameState.pHP = result.pHP;
+        gameState.cHP = result.cHP;
+        gameState.pEnergy = result.pEnergy;
+        gameState.cEnergy = result.cEnergy;
+        gameState.player.effects = result.pEffects;
+        gameState.cpu.effects = result.cEffects;
+
+        if (result.pDmgTaken > 0) pC.classList.add('shake');
+        if (result.cDmgTaken > 0) cC.classList.add('shake');
+
+        updateUI();
+        view.classList.replace('opacity-100', 'opacity-0'); document.getElementById('vs-label').style.opacity = '1'; pC.classList.remove('zone-dim'); cC.classList.remove('zone-dim');
+
+        setTimeout(() => {
+            pC.classList.remove('shake'); cC.classList.remove('shake');
+            const cWinF = (gameState.cEnergy >= gameState.cpu.winE);
+            if (gameState.pHP <= 0 || gameState.cHP <= 0 || gameState.pEnergy >= gameState.player.winE || cWinF) showFinal(cWinF);
+            else {
+                gameState.turn++; gameState.isProc = false; gameState.selectedCmd = null;
+                document.getElementById('command-wrapper').classList.remove('ui-hidden');
+                document.getElementById('btn-ready').classList.remove('hidden');
+                updateUI();
+                setMessage("Command Select");
+            }
+        }, 500);
+    }, 1800);
+}
+
+function showFinal(cpuEWin) {
+    gameState.gameOver = true; const ov = document.getElementById('result-overlay'), tit = document.getElementById('result-title'), desc = document.getElementById('result-desc'), nextB = document.getElementById('btn-next-stage'), streakB = document.getElementById('streak-result-box');
+    let res = "DRAW", d = "SIMULTANEOUS";
+    if (gameState.pHP <= 0 && gameState.cHP <= 0) { res = "DRAW"; d = "DOUBLE K.O."; }
+    else if (gameState.cHP <= 0) { res = "VICTORY"; d = "ENEMY DESTROYED"; sound.playSE('victory'); }
+    else if (gameState.pHP <= 0) { res = "DEFEAT"; d = "HP EXHAUSTED"; sound.playSE('defeat'); }
+    else if (gameState.pEnergy >= gameState.player.winE) { res = "VICTORY"; d = "CHARGED UP"; sound.playSE('victory'); }
+    else if (cpuEWin) { res = "DEFEAT"; d = "CPU CHARGED UP"; sound.playSE('defeat'); }
+    tit.innerText = res; desc.innerText = d; tit.className = `text-5xl font-black italic font-orbitron mb-4 ${res === 'VICTORY' ? 'text-emerald-400' : res === 'DEFEAT' ? 'text-rose-500' : 'text-white'}`;
+
+    nextB.classList.add('hidden'); streakB.classList.add('hidden');
+
+    if (res === 'VICTORY' && gameState.gameMode === 'tower') {
+        handleTowerVictory();
+    } else if (gameState.gameMode === 'tower') {
+        streakB.classList.remove('hidden');
+        document.getElementById('final-streak-val').innerText = gameState.floor;
+        if (gameState.floor > gameState.highStreak) {
+            gameState.highStreak = gameState.floor;
+            saveHighStreak(gameState.highStreak);
+        }
+        ov.classList.remove('hidden'); setTimeout(() => ov.classList.add('opacity-100'), 10);
+    } else {
+        ov.classList.remove('hidden'); setTimeout(() => ov.classList.add('opacity-100'), 10);
+    }
+}
+
+function handleTowerVictory() {
+    document.getElementById('result-overlay').classList.add('hidden');
+    showFloorClearAnim(() => showTreasure());
+}
+
+function showFloorClearAnim(callback) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[300] bg-slate-950/90 flex flex-col items-center justify-center animate-fade-in';
+    const nextIsBoss = ((gameState.floor + 1) % 5 === 0);
+    const accentColor = nextIsBoss ? 'text-rose-500' : 'text-emerald-500';
+
+    overlay.innerHTML = `
+        <div class="text-center">
+            <div class="font-orbitron text-slate-500 text-sm font-black tracking-[0.5em] mb-4 uppercase">Floor Cleared</div>
+            <div class="flex items-center justify-center gap-8 mb-8">
+                <div class="flex flex-col">
+                    <span class="font-orbitron text-slate-700 text-xs font-bold uppercase">Current</span>
+                    <span class="font-orbitron text-slate-500 text-5xl font-black italic">F${gameState.floor}</span>
+                </div>
+                <i data-lucide="chevrons-right" class="w-12 h-12 ${accentColor} ${nextIsBoss ? 'animate-ping' : 'animate-side-pulse'}"></i>
+                <div class="flex flex-col">
+                    <span class="${accentColor} font-orbitron text-xs font-bold uppercase">${nextIsBoss ? 'CAUTION' : 'Next'}</span>
+                    <span class="font-orbitron text-white text-7xl font-black italic ${nextIsBoss ? 'drop-shadow-[0_0_25px_rgba(244,63,94,0.7)]' : 'drop-shadow-[0_0_20px_rgba(52,211,153,0.5)]'}">F${gameState.floor + 1}</span>
+                </div>
+            </div>
+            <div class="font-orbitron ${accentColor} text-[10px] font-black uppercase tracking-[0.3em]">${nextIsBoss ? 'High energy reading detected ahead...' : 'Ascending to the next level...'}</div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        overlay.style.transition = 'all 0.5s'; overlay.style.opacity = '0'; overlay.style.transform = 'scale(1.1)';
+        setTimeout(() => { document.body.removeChild(overlay); callback(); }, 500);
+    }, 2200);
+}
+
+function showTreasure() {
+    const treasureOverlay = document.getElementById('treasure-overlay');
+    const cardsContainer = document.getElementById('treasure-cards-container');
+    const options = generateTreasureOptions();
+    cardsContainer.innerHTML = '';
+
+    options.forEach(option => {
+        const card = document.createElement('div');
+        card.className = 'w-full md:w-1/3 bg-slate-900 border-4 border-slate-700 p-6 rounded-3xl shadow-lg cursor-pointer hover:border-amber-400 hover:scale-105 transition-all flex flex-col items-center text-center';
+        let title, description, icon;
+        if (option.type === 'skill') {
+            title = `新スキル: ${option.skill.name}`;
+            description = `${option.skill.description} (コスト: ${option.skill.cost})`;
+            icon = 'star';
+        } else {
+            title = '強化アイテム';
+            const meritValue = option.merit.valueRange[0] + Math.floor(Math.random() * (option.merit.valueRange[1] - option.merit.valueRange[0] + 1));
+            option.merit.value = meritValue;
+            const demeritValue = option.demerit.valueRange[0] + Math.floor(Math.random() * (option.demerit.valueRange[1] - option.demerit.valueRange[0] + 1));
+            option.demerit.value = demeritValue;
+            description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', meritValue)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', demeritValue)}</span>`;
+            icon = 'gem';
+        }
+        card.innerHTML = `<i data-lucide="${icon}" class="w-12 h-12 mb-4 ${option.type === 'skill' ? 'text-purple-400' : 'text-amber-400'}"></i><h3 class="font-orbitron font-bold text-lg mb-2 text-white">${title}</h3><div class="text-xs text-slate-400 font-bold">${description}</div>`;
+        card.onclick = () => selectTreasure(option);
+        cardsContainer.appendChild(card);
+    });
+    lucide.createIcons();
+    treasureOverlay.classList.remove('hidden');
+    setTimeout(() => treasureOverlay.classList.add('opacity-100'), 10);
+}
+
+function generateTreasureOptions() {
+    const options = [];
+    for (let i = 0; i < 3; i++) {
+        const rand = Math.random();
+        if (rand < 0.8) {
+            const availableMerits = ITEM_EFFECTS.MERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
+            const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
+            const demerit = ITEM_EFFECTS.DEMERITS[Math.floor(Math.random() * ITEM_EFFECTS.DEMERITS.length)];
+            options.push({ type: 'item', merit, demerit });
+        } else {
+            const unownedSkills = SKILLS.filter(s => !gameState.playerSkill || s.id !== gameState.playerSkill.id);
+            const skillPool = unownedSkills.length > 0 ? unownedSkills : SKILLS;
+            const skill = skillPool[Math.floor(Math.random() * skillPool.length)];
+            const [minCost, maxCost] = skill.costRange;
+            const cost = minCost + Math.floor(Math.random() * (maxCost - minCost + 1));
+            const effectValues = skill.effectRanges.map(([min, max]) => min + Math.floor(Math.random() * (max - min + 1)));
+            let desc = skill.description; effectValues.forEach(v => desc = desc.replace('?', v));
+            options.push({ type: 'skill', skill: { ...skill, cost, effectValues, description: desc } });
+        }
+    }
+    return options;
+}
+
+function selectTreasure(reward) {
+    sound.playSE('victory');
+    const treasureOverlay = document.getElementById('treasure-overlay');
+    if (reward.type === 'item') {
+        reward.merit.apply(gameState.pChar, reward.merit.value);
+        reward.demerit.apply(gameState.pChar, reward.demerit.value);
+    } else if (reward.type === 'skill') {
+        gameState.playerSkill = reward.skill;
+    }
+    gameState.winsSinceChest = 0;
+    treasureOverlay.classList.remove('opacity-100');
+    setTimeout(() => {
+        treasureOverlay.classList.add('hidden');
+        gameState.winStreak++; gameState.floor++;
+        gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+        setupBattleState();
+    }, 500);
+}
+
+export function showInitialSkillSelection() {
+    const treasureOverlay = document.getElementById('treasure-overlay');
+    const cardsContainer = document.getElementById('treasure-cards-container');
+    const title = treasureOverlay.querySelector('h2');
+    const desc = treasureOverlay.querySelector('p');
+
+    title.innerText = "Select Starting Skill";
+    desc.innerText = "最初のスキルを選択してください";
+
+    const shuffledSkills = [...SKILLS].sort(() => 0.5 - Math.random());
+    const options = shuffledSkills.slice(0, 3).map(skill => {
+        const [minCost, maxCost] = skill.costRange;
+        const cost = minCost + Math.floor(Math.random() * (maxCost - minCost + 1));
+        const effectValues = skill.effectRanges.map(([min, max]) => min + Math.floor(Math.random() * (max - min + 1)));
+        let dynamicDescription = skill.description;
+        effectValues.forEach(v => dynamicDescription = dynamicDescription.replace('?', v));
+        return { ...skill, cost, effectValues, description: dynamicDescription };
+    });
+
+    cardsContainer.innerHTML = '';
+    options.forEach(skill => {
+        const card = document.createElement('div');
+        card.className = 'w-full md:w-1/3 bg-slate-900 border-4 border-slate-700 p-6 rounded-3xl shadow-lg cursor-pointer hover:border-purple-400 hover:scale-105 transition-all flex flex-col items-center text-center';
+        card.innerHTML = `<i data-lucide="star" class="w-12 h-12 mb-4 text-purple-400"></i><h3 class="font-orbitron font-bold text-lg mb-2 text-white">${skill.name}</h3><div class="text-xs text-slate-400 font-bold">${skill.description}<br><span class="text-purple-400">COST: ${skill.cost}</span></div>`;
+        card.onclick = () => {
+            gameState.playerSkill = skill;
+            sound.playSE('victory');
+            treasureOverlay.classList.remove('opacity-100');
+            setTimeout(() => {
+                treasureOverlay.classList.add('hidden');
+                title.innerText = "Choose Your Reward";
+                desc.innerText = "Select one of three options";
+                setupBattleState();
+            }, 500);
+        };
+        cardsContainer.appendChild(card);
+    });
+
+    lucide.createIcons();
+    treasureOverlay.classList.remove('hidden');
+    setTimeout(() => treasureOverlay.classList.add('opacity-100'), 10);
+}
