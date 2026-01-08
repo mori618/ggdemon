@@ -130,7 +130,7 @@ export function updateEffects(effects) {
     return { effects: updated, totals };
 }
 
-export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP }) {
+export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory }) {
     const pAtk = player.atk + (player.tempAtk || 0);
     const cAtk = cpu.atk + (cpu.tempAtk || 0);
     const cGrdC = Math.max(0, cpu.grdC + (cpu.tempGrdC || 0));
@@ -167,6 +167,35 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
 
     if (cEnergy + cChgE >= cWinLimit && !pCanKillC) {
         if (canCCharge) weights.CHARGE += 150;
+    }
+
+    // History Analysis
+    if (playerHistory && playerHistory.length >= 3) {
+        const lastMove = playerHistory[playerHistory.length - 1];
+        const last3 = playerHistory.slice(-3);
+        const isSpamming = last3.every(m => m === lastMove);
+
+        // Pattern: Detect Spamming
+        if (isSpamming) {
+            if (lastMove === 'CHARGE') weights.ATTACK += 50;
+            if (lastMove === 'ATTACK') weights.GUARD += 50;
+            if (lastMove === 'GUARD') weights.CHARGE += 50;
+        }
+
+        // Pattern: Frequency Analysis
+        const total = playerHistory.length;
+        const counts = playerHistory.reduce((acc, m) => { acc[m] = (acc[m] || 0) + 1; return acc; }, {});
+
+        if ((counts['ATTACK'] || 0) / total > 0.6) {
+            weights.GUARD += 30;
+            weights.ATTACK += 20;
+        }
+        if ((counts['GUARD'] || 0) / total > 0.6) {
+            weights.CHARGE += 40;
+        }
+        if ((counts['CHARGE'] || 0) / total > 0.6) {
+            weights.ATTACK += 40;
+        }
     }
 
     if (aiLevel === 'HARD' || gameMode === 'tower') {

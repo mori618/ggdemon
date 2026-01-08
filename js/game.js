@@ -117,7 +117,8 @@ export function getCpuMove() {
         gameMode: gameState.gameMode,
         floor: gameState.floor,
         cHP: gameState.cHP,
-        pHP: gameState.pHP
+        pHP: gameState.pHP,
+        playerHistory: gameState.playerHistory
     });
 }
 
@@ -167,8 +168,8 @@ export function executeTurn(pM, cM) {
     setTimeout(() => {
         // 2. Calculate Result
         const result = calculateTurnResult(
-            { ...gameState.player, energy: gameState.pEnergy },
-            { ...gameState.cpu, energy: gameState.cEnergy },
+            { ...gameState.player, energy: gameState.pEnergy, hp: gameState.pHP },
+            { ...gameState.cpu, energy: gameState.cEnergy, hp: gameState.cHP },
             pM, cM, gameState.playerSkill
         );
 
