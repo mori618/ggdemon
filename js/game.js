@@ -211,7 +211,7 @@ export function executeTurn(pM, cM) {
                 setMessage("Command Select");
             }
         }, 500);
-    }, 1800);
+    }, 800);
 }
 
 function showFinal(cpuEWin) {
