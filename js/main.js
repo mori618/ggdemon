@@ -2,7 +2,7 @@ import { CHARACTERS } from './constants.js';
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
-import { setupBattleState, getCpuMove, executeTurn, showInitialSkillSelection } from './game.js';
+import { setupBattleState, getCpuMove, executeTurn } from './game.js';
 
 window.onload = () => {
     lucide.createIcons();
@@ -175,16 +175,18 @@ function handleCharSelect(id) {
 }
 
 function startTower() {
-    gameState.floor = 1; gameState.winStreak = 0; gameState.winsSinceChest = 0; gameState.playerSkill = null;
+    gameState.floor = 0;
+    gameState.winStreak = 0;
+    gameState.winsSinceChest = 0;
+    gameState.playerSkill = null;
     gameState.aiLevel = 'NORMAL';
     gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
     document.getElementById('select-screen').classList.add('hidden');
     document.getElementById('tower-indicator').classList.remove('hidden');
-    showInitialSkillSelection();
+    setupBattleState();
 }
 
 function startGame() {
     sound.playSE('ready');
     setupBattleState();
-    document.getElementById('select-screen').classList.add('hidden');
 }

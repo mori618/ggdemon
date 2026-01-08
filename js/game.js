@@ -1,4 +1,4 @@
-import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS } from './constants.js';
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER } from './constants.js';
 import { gameState, saveHighStreak } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy } from './ui.js';
@@ -37,27 +37,48 @@ export function setupBattleState() {
         const bossIn = 5 - ((gameState.floor - 1) % 5);
         document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : bossIn;
 
-        if (isBoss) {
+        if (gameState.floor === 0) {
+            gameState.cpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+            gameState.aiLevel = 'EASY';
+            badge.innerText = `START`;
+            badge.classList.add('bg-amber-600');
+        } else if (isBoss) {
+            gameState.aiLevel = 'NORMAL';
             gameState.cpu.hp += Math.floor(gameState.floor / 2);
             gameState.cpu.atk += Math.floor(gameState.floor / 10);
             badge.innerText = `BOSS`;
             badge.classList.add('bg-purple-600', 'animate-pulse');
         } else {
-            const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
-            gameState.cpu.name = trait.name + gameState.cpu.name;
-            gameState.cpu.hp = Math.max(1, gameState.cpu.hp + (trait.hp || 0));
-            gameState.cpu.atk = Math.max(1, gameState.cpu.atk + (trait.atk || 0));
-            gameState.cpu.chgE = Math.max(1, gameState.cpu.chgE + (trait.chgE || 0));
-            gameState.cpu.winE = Math.max(3, gameState.cpu.winE + (trait.winE || 0));
-            gameState.cpu.grdC = Math.max(0, gameState.cpu.grdC + (trait.grdC || 0));
-            gameState.cpu.atkC = Math.max(0, gameState.cpu.atkC + (trait.atkC || 0));
-            gameState.cpu.startE = Math.max(0, gameState.cpu.startE + (trait.startE || 0));
-            gameState.cpu.tagline = trait.tagline;
+            const cyclePos = (gameState.floor - 1) % 5; // 0, 1, 2, 3
+            if (cyclePos === 0) {
+                // Determine treasure floor for this cycle (0-3)
+                gameState.treasureFloorOffset = Math.floor(Math.random() * 4);
+            }
 
-            const floorBoost = Math.floor(gameState.floor / 5);
-            gameState.cpu.hp += floorBoost;
-            badge.innerText = `FLOOR ${gameState.floor}`;
-            badge.classList.add('bg-slate-700');
+            if (cyclePos === gameState.treasureFloorOffset) {
+                gameState.cpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+                gameState.aiLevel = 'EASY';
+                badge.innerText = `TREASURE`;
+                badge.classList.add('bg-amber-600');
+            } else {
+                gameState.aiLevel = (gameState.floor <= 2) ? 'EASY' : 'NORMAL';
+                const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
+                gameState.cpu.name = trait.name + gameState.cpu.name;
+                gameState.cpu.hp = Math.max(1, gameState.cpu.hp + (trait.hp || 0));
+                gameState.cpu.atk = Math.max(1, gameState.cpu.atk + (trait.atk || 0));
+                gameState.cpu.chgE = Math.max(1, gameState.cpu.chgE + (trait.chgE || 0));
+                gameState.cpu.winE = Math.max(3, gameState.cpu.winE + (trait.winE || 0));
+                gameState.cpu.grdC = Math.max(0, gameState.cpu.grdC + (trait.grdC || 0));
+                gameState.cpu.atkC = Math.max(0, gameState.cpu.atkC + (trait.atkC || 0));
+                gameState.cpu.startE = Math.max(0, gameState.cpu.startE + (trait.startE || 0));
+                gameState.cpu.tagline = trait.tagline;
+
+                const floorBoost = Math.floor(gameState.floor / 5);
+                gameState.cpu.hp += floorBoost;
+                if (gameState.floor <= 2) gameState.cpu.hp = 1;
+                badge.innerText = `FLOOR ${gameState.floor}`;
+                badge.classList.add('bg-slate-700');
+            }
         }
         badge.classList.remove('hidden');
     } else {
@@ -228,7 +249,8 @@ function showFloorClearAnim(callback) {
 function showTreasure() {
     const treasureOverlay = document.getElementById('treasure-overlay');
     const cardsContainer = document.getElementById('treasure-cards-container');
-    const options = generateTreasureOptions();
+    const isMimic = (gameState.cpu.id === 'TREASURE_CHEST');
+    const options = generateTreasureOptions(isMimic);
     cardsContainer.innerHTML = '';
 
     options.forEach(option => {
@@ -252,16 +274,23 @@ function showTreasure() {
         card.onclick = () => selectTreasure(option);
         cardsContainer.appendChild(card);
     });
+
+    // Add Skip Button
+    const skipCard = document.createElement('div');
+    skipCard.className = 'w-full md:w-1/3 bg-slate-800 border-4 border-slate-600 p-6 rounded-3xl shadow-lg cursor-pointer hover:border-slate-400 hover:scale-105 transition-all flex flex-col items-center justify-center text-center';
+    skipCard.innerHTML = `<i data-lucide="skip-forward" class="w-12 h-12 mb-4 text-slate-400"></i><h3 class="font-orbitron font-bold text-lg mb-2 text-white">SKIP</h3><div class="text-[10px] text-slate-500 font-bold uppercase">能力を変更せずに進む</div>`;
+    skipCard.onclick = () => selectTreasure({ type: 'skip' });
+    cardsContainer.appendChild(skipCard);
+
     lucide.createIcons();
     treasureOverlay.classList.remove('hidden');
     setTimeout(() => treasureOverlay.classList.add('opacity-100'), 10);
 }
 
-function generateTreasureOptions() {
+function generateTreasureOptions(isMimic) {
     const options = [];
     for (let i = 0; i < 3; i++) {
-        const rand = Math.random();
-        if (rand < 0.8) {
+        if (!isMimic) {
             const availableMerits = ITEM_EFFECTS.MERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
             const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
             const demerit = ITEM_EFFECTS.DEMERITS[Math.floor(Math.random() * ITEM_EFFECTS.DEMERITS.length)];
@@ -289,6 +318,8 @@ function selectTreasure(reward) {
     } else if (reward.type === 'skill') {
         gameState.playerSkill = reward.skill;
     }
+    // 'skip' does nothing
+
     gameState.winsSinceChest = 0;
     treasureOverlay.classList.remove('opacity-100');
     setTimeout(() => {
@@ -297,47 +328,4 @@ function selectTreasure(reward) {
         gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
         setupBattleState();
     }, 500);
-}
-
-export function showInitialSkillSelection() {
-    const treasureOverlay = document.getElementById('treasure-overlay');
-    const cardsContainer = document.getElementById('treasure-cards-container');
-    const title = treasureOverlay.querySelector('h2');
-    const desc = treasureOverlay.querySelector('p');
-
-    title.innerText = "Select Starting Skill";
-    desc.innerText = "最初のスキルを選択してください";
-
-    const shuffledSkills = [...SKILLS].sort(() => 0.5 - Math.random());
-    const options = shuffledSkills.slice(0, 3).map(skill => {
-        const [minCost, maxCost] = skill.costRange;
-        const cost = minCost + Math.floor(Math.random() * (maxCost - minCost + 1));
-        const effectValues = skill.effectRanges.map(([min, max]) => min + Math.floor(Math.random() * (max - min + 1)));
-        let dynamicDescription = skill.description;
-        effectValues.forEach(v => dynamicDescription = dynamicDescription.replace('?', v));
-        return { ...skill, cost, effectValues, description: dynamicDescription };
-    });
-
-    cardsContainer.innerHTML = '';
-    options.forEach(skill => {
-        const card = document.createElement('div');
-        card.className = 'w-full md:w-1/3 bg-slate-900 border-4 border-slate-700 p-6 rounded-3xl shadow-lg cursor-pointer hover:border-purple-400 hover:scale-105 transition-all flex flex-col items-center text-center';
-        card.innerHTML = `<i data-lucide="star" class="w-12 h-12 mb-4 text-purple-400"></i><h3 class="font-orbitron font-bold text-lg mb-2 text-white">${skill.name}</h3><div class="text-xs text-slate-400 font-bold">${skill.description}<br><span class="text-purple-400">COST: ${skill.cost}</span></div>`;
-        card.onclick = () => {
-            gameState.playerSkill = skill;
-            sound.playSE('victory');
-            treasureOverlay.classList.remove('opacity-100');
-            setTimeout(() => {
-                treasureOverlay.classList.add('hidden');
-                title.innerText = "Choose Your Reward";
-                desc.innerText = "Select one of three options";
-                setupBattleState();
-            }, 500);
-        };
-        cardsContainer.appendChild(card);
-    });
-
-    lucide.createIcons();
-    treasureOverlay.classList.remove('hidden');
-    setTimeout(() => treasureOverlay.classList.add('opacity-100'), 10);
 }

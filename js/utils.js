@@ -20,7 +20,8 @@ export const gameState = {
     floor: 1,
     winsSinceChest: 0,
     playerSkill: null,
-    playerHistory: []
+    playerHistory: [],
+    treasureFloorOffset: 0, // Offset within a 5-floor cycle (0-4, but Floor 5/10 are bosses)
 };
 
 export const MAX_HISTORY = 5;

@@ -23,6 +23,8 @@ export const BOSS_CHARACTERS = [
     { id: 'CORE_TITAN', name: 'Core Titan', hp: 25, atk: 4, winE: 15, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 0, icon: 'database', tagline: '一撃必殺のチャージを蓄える巨像' }
 ];
 
+export const TREASURE_MONSTER = { id: 'TREASURE_CHEST', name: 'Treasure', hp: 1, atk: 0, winE: 1, chgE: 0, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'archive', tagline: '中にはお宝が詰まっているようだ' };
+
 export const SKILLS = [
     { id: 'ASSAULT', name: '強襲', category: 'ATTACK', description: '敵に ? ダメージを与える（ガードされた場合、自身に反動ダメージ）。', costRange: [2, 4], effectRanges: [[2, 3]] },
     { id: 'DRAIN', name: 'ドレイン', category: 'SPECIAL', description: '相手のエネルギーを ? 減少させる。', costRange: [1, 3], effectRanges: [[2, 3]] },
