@@ -39,6 +39,8 @@ export function setupBattleState() {
 
         if (gameState.floor === 0) {
             gameState.cpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+            gameState.cpu.effects = [];
+            gameState.cpu.tempAtk = gameState.cpu.tempGrdC = gameState.cpu.tempChgE = gameState.cpu.tempChgC = gameState.cpu.tempDmgReduce = 0;
             gameState.aiLevel = 'EASY';
             badge.innerText = `START`;
             badge.classList.add('bg-amber-600');
@@ -57,6 +59,8 @@ export function setupBattleState() {
 
             if (cyclePos === gameState.treasureFloorOffset) {
                 gameState.cpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+                gameState.cpu.effects = [];
+                gameState.cpu.tempAtk = gameState.cpu.tempGrdC = gameState.cpu.tempChgE = gameState.cpu.tempChgC = gameState.cpu.tempDmgReduce = 0;
                 gameState.aiLevel = 'EASY';
                 badge.innerText = `TREASURE`;
                 badge.classList.add('bg-amber-600');
@@ -197,8 +201,12 @@ export function executeTurn(pM, cM) {
         setTimeout(() => {
             pC.classList.remove('shake'); cC.classList.remove('shake');
             const cWinF = (gameState.cEnergy >= gameState.cpu.winE);
-            if (gameState.pHP <= 0 || gameState.cHP <= 0 || gameState.pEnergy >= gameState.player.winE || cWinF) showFinal(cWinF);
-            else {
+            if (gameState.pHP <= 0 || gameState.cHP <= 0 || gameState.pEnergy >= gameState.player.winE || cWinF) {
+                // 戦闘終了時にダイアログを確実に非表示
+                dialogOverlay.classList.add('opacity-0');
+                setTimeout(() => dialogOverlay.classList.add('hidden'), 300);
+                showFinal(cWinF);
+            } else {
                 gameState.turn++; gameState.isProc = false; gameState.selectedCmd = null;
 
                 // Hide Dialog
@@ -215,7 +223,13 @@ export function executeTurn(pM, cM) {
 }
 
 function showFinal(cpuEWin) {
-    gameState.gameOver = true; const ov = document.getElementById('result-overlay'), tit = document.getElementById('result-title'), desc = document.getElementById('result-desc'), nextB = document.getElementById('btn-next-stage'), streakB = document.getElementById('streak-result-box');
+    gameState.gameOver = true;
+
+    // バトルダイアログを強制的に非表示
+    const dialogOverlay = document.getElementById('battle-dialog-overlay');
+    dialogOverlay.classList.add('opacity-0', 'hidden');
+
+    const ov = document.getElementById('result-overlay'), tit = document.getElementById('result-title'), desc = document.getElementById('result-desc'), nextB = document.getElementById('btn-next-stage'), streakB = document.getElementById('streak-result-box');
     let res = "DRAW", d = "SIMULTANEOUS";
     if (gameState.pHP <= 0 && gameState.cHP <= 0) { res = "DRAW"; d = "DOUBLE K.O."; }
     else if (gameState.cHP <= 0) { res = "VICTORY"; d = "ENEMY DESTROYED"; sound.playSE('victory'); }
@@ -287,7 +301,7 @@ function showTreasure() {
 
     options.forEach(option => {
         const card = document.createElement('div');
-        card.className = 'w-full md:w-1/3 bg-slate-900 border-4 border-slate-700 p-6 rounded-3xl shadow-lg cursor-pointer hover:border-amber-400 hover:scale-105 transition-all flex flex-col items-center text-center';
+        card.className = 'w-full max-w-md mx-auto bg-slate-900 border-4 border-slate-700 p-6 rounded-2xl shadow-lg cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all flex flex-row items-center gap-4';
         let title, description, icon;
         if (option.type === 'skill') {
             title = `新スキル: ${option.skill.name}`;
@@ -302,15 +316,31 @@ function showTreasure() {
             description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', meritValue)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', demeritValue)}</span>`;
             icon = 'gem';
         }
-        card.innerHTML = `<i data-lucide="${icon}" class="w-12 h-12 mb-4 ${option.type === 'skill' ? 'text-purple-400' : 'text-amber-400'}"></i><h3 class="font-orbitron font-bold text-lg mb-2 text-white">${title}</h3><div class="text-xs text-slate-400 font-bold">${description}</div>`;
+        card.innerHTML = `
+            <div class="flex-shrink-0">
+                <i data-lucide="${icon}" class="w-12 h-12 ${option.type === 'skill' ? 'text-purple-400' : 'text-amber-400'}"></i>
+            </div>
+            <div class="flex-1 text-left">
+                <h3 class="font-orbitron font-bold text-lg mb-2 text-white">${title}</h3>
+                <div class="text-sm text-slate-400 font-bold">${description}</div>
+            </div>
+        `;
         card.onclick = () => selectTreasure(option);
         cardsContainer.appendChild(card);
     });
 
     // Add Skip Button
     const skipCard = document.createElement('div');
-    skipCard.className = 'w-full md:w-1/3 bg-slate-800 border-4 border-slate-600 p-6 rounded-3xl shadow-lg cursor-pointer hover:border-slate-400 hover:scale-105 transition-all flex flex-col items-center justify-center text-center';
-    skipCard.innerHTML = `<i data-lucide="skip-forward" class="w-12 h-12 mb-4 text-slate-400"></i><h3 class="font-orbitron font-bold text-lg mb-2 text-white">SKIP</h3><div class="text-[10px] text-slate-500 font-bold uppercase">能力を変更せずに進む</div>`;
+    skipCard.className = 'w-full max-w-md mx-auto bg-slate-800 border-4 border-slate-600 p-6 rounded-2xl shadow-lg cursor-pointer hover:border-slate-400 hover:scale-[1.02] transition-all flex flex-row items-center gap-4';
+    skipCard.innerHTML = `
+        <div class="flex-shrink-0">
+            <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
+        </div>
+        <div class="flex-1 text-left">
+            <h3 class="font-orbitron font-bold text-lg mb-2 text-white">SKIP</h3>
+            <div class="text-sm text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
+        </div>
+    `;
     skipCard.onclick = () => selectTreasure({ type: 'skip' });
     cardsContainer.appendChild(skipCard);
 
@@ -325,7 +355,8 @@ function generateTreasureOptions(isMimic) {
         if (!isMimic) {
             const availableMerits = ITEM_EFFECTS.MERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
             const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
-            const demerit = ITEM_EFFECTS.DEMERITS[Math.floor(Math.random() * ITEM_EFFECTS.DEMERITS.length)];
+            const availableDemerits = ITEM_EFFECTS.DEMERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
+            const demerit = availableDemerits[Math.floor(Math.random() * availableDemerits.length)];
             options.push({ type: 'item', merit, demerit });
         } else {
             const unownedSkills = SKILLS.filter(s => !gameState.playerSkill || s.id !== gameState.playerSkill.id);

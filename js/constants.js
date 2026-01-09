@@ -23,7 +23,7 @@ export const BOSS_CHARACTERS = [
     { id: 'CORE_TITAN', name: 'Core Titan', hp: 25, atk: 4, winE: 15, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 0, icon: 'database', tagline: '一撃必殺のチャージを蓄える巨像' }
 ];
 
-export const TREASURE_MONSTER = { id: 'TREASURE_CHEST', name: 'Treasure', hp: 1, atk: 0, winE: 1, chgE: 0, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'gift', tagline: '中にはお宝が詰まっているようだ' };
+export const TREASURE_MONSTER = { id: 'TREASURE_CHEST', name: 'Treasure', hp: 1, atk: 7, winE: 10, chgE: 1, grdC: 10, atkC: 7, chgC: 0, startE: 0, icon: 'gift', tagline: '中にはお宝が詰まっているようだ' };
 
 export const SKILLS = [
     { id: 'ASSAULT', name: '強襲', category: 'ATTACK', description: '敵に ? ダメージを与える（ガードされた場合、自身に反動ダメージ）。', costRange: [2, 4], effectRanges: [[2, 3]] },
@@ -57,14 +57,14 @@ export const ITEM_EFFECTS = {
     DEMERITS: [
         { id: 'ATK_DOWN', text: 'ATKが $V ダウン', apply: (p, v) => p.atk = Math.max(1, p.atk - v), valueRange: [1, 1] },
         { id: 'HP_DOWN', text: '最大HPが $V ダウン', apply: (p, v) => p.hp = Math.max(1, p.hp - v), valueRange: [1, 2] },
-        { id: 'CHGE_DOWN', text: 'チャージ効率(ChgE)が $V ダウン', apply: (p, v) => p.chgE = Math.max(0, p.chgE - v), valueRange: [1, 1] },
+        { id: 'CHGE_DOWN', text: 'チャージ効率(ChgE)が $V ダウン', apply: (p, v) => p.chgE = Math.max(1, p.chgE - v), valueRange: [1, 1], condition: p => p.chgE > 1 },
         { id: 'WINE_UP', text: '勝利必要E(WinE)が $V アップ', apply: (p, v) => p.winE += v, valueRange: [1, 3] },
         { id: 'GRDC_UP', text: 'ガードコストが $V アップ', apply: (p, v) => p.grdC += v, valueRange: [1, 1] },
         { id: 'ATKC_UP', text: '攻撃コストが $V アップ', apply: (p, v) => p.atkC += v, valueRange: [1, 2] },
         { id: 'START_E_DOWN', text: '初期エネルギーが $V ダウン', apply: (p, v) => p.startE = Math.max(0, p.startE - v), valueRange: [1, 2] },
         { id: 'SKILL_EFFECT_DOWN', text: 'スキル効果量が $V ダウン', apply: (p, v) => p.skillEffectBonus = (p.skillEffectBonus || 0) - v, valueRange: [1, 1] },
         { id: 'SKILL_COST_UP', text: 'スキルコストが $V アップ', apply: (p, v) => p.skillCostBonus = (p.skillCostBonus || 0) + v, valueRange: [1, 1] },
-        { id: 'CHARGE_COST_UP', text: 'チャージコストが $V アップ', apply: (p, v) => p.chgC = (p.chgC || 0) + v, valueRange: [1, 1] },
+        { id: 'CHARGE_COST_UP', text: 'チャージコストが $V アップ', apply: (p, v) => p.chgC = (p.chgC || 0) + v, valueRange: [1, 1], condition: () => false },
     ]
 };
 

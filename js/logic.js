@@ -85,9 +85,11 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             else if (cAtk > pAtk) pDmgTaken += cAtk;
         }
     }
+    // CHARGE系とSPECIAL系スキルは相手の攻撃を受ける
     else if (playerBehavior === 'CHARGE' || playerBehavior === 'SPECIAL') {
         if (cpuMove === 'ATTACK') pDmgTaken += cAtk;
     }
+    // GUARD系スキルは相手の攻撃を防ぐ（ダメージを受けない）
 
     if (playerMove === 'SKILL' && playerSkill) {
         const skillEffectBonus = player.skillEffectBonus || 0;
@@ -211,5 +213,13 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
     });
 
     if (pool.length === 0) return 'CHARGE';
-    return pool[Math.floor(Math.random() * pool.length)];
+
+    // 選択された行動のエネルギーチェック
+    let selectedMove = pool[Math.floor(Math.random() * pool.length)];
+
+    // エネルギー不足の場合はCHARGEにフォールバック
+    if (selectedMove === 'ATTACK' && !canCAttack) selectedMove = 'CHARGE';
+    if (selectedMove === 'GUARD' && !canCGuard) selectedMove = 'CHARGE';
+
+    return selectedMove;
 }

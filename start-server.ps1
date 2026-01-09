@@ -1,7 +1,7 @@
 # Simple HTTP Server for G.G Demon
 # このスクリプトを実行してゲームをプレイしてください
 
-$port = 8000
+$port = 8001
 $path = $PSScriptRoot
 
 Write-Host "================================================" -ForegroundColor Cyan
@@ -39,14 +39,14 @@ try {
             $ext = [System.IO.Path]::GetExtension($filePath)
             $contentType = switch ($ext) {
                 '.html' { 'text/html; charset=utf-8' }
-                '.js'   { 'application/javascript; charset=utf-8' }
-                '.css'  { 'text/css; charset=utf-8' }
+                '.js' { 'application/javascript; charset=utf-8' }
+                '.css' { 'text/css; charset=utf-8' }
                 '.json' { 'application/json; charset=utf-8' }
-                '.png'  { 'image/png' }
-                '.jpg'  { 'image/jpeg' }
+                '.png' { 'image/png' }
+                '.jpg' { 'image/jpeg' }
                 '.jpeg' { 'image/jpeg' }
-                '.gif'  { 'image/gif' }
-                '.svg'  { 'image/svg+xml' }
+                '.gif' { 'image/gif' }
+                '.svg' { 'image/svg+xml' }
                 default { 'application/octet-stream' }
             }
             
@@ -57,7 +57,8 @@ try {
             $buffer = [System.IO.File]::ReadAllBytes($filePath)
             $response.ContentLength64 = $buffer.Length
             $response.OutputStream.Write($buffer, 0, $buffer.Length)
-        } else {
+        }
+        else {
             # 404 Not Found
             $response.StatusCode = 404
             $buffer = [System.Text.Encoding]::UTF8.GetBytes("404 - File Not Found: $localPath")
@@ -67,7 +68,8 @@ try {
         
         $response.OutputStream.Close()
     }
-} finally {
+}
+finally {
     $listener.Stop()
     Write-Host "Server stopped." -ForegroundColor Red
 }
