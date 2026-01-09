@@ -351,12 +351,34 @@ function showTreasure() {
 
 function generateTreasureOptions(isMimic) {
     const options = [];
+
+    // Helper function to extract parameter name from effect ID
+    const getParamFromId = (id) => {
+        // Remove _UP or _DOWN suffix to get the base parameter
+        return id.replace(/_UP$|_DOWN$/, '');
+    };
+
     for (let i = 0; i < 3; i++) {
         if (!isMimic) {
             const availableMerits = ITEM_EFFECTS.MERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
             const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
-            const availableDemerits = ITEM_EFFECTS.DEMERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
-            const demerit = availableDemerits[Math.floor(Math.random() * availableDemerits.length)];
+
+            // Get the parameter affected by the selected merit
+            const meritParam = getParamFromId(merit.id);
+
+            // Filter out demerits that affect the same parameter as the merit
+            const availableDemerits = ITEM_EFFECTS.DEMERITS.filter(item => {
+                if (item.condition && !item.condition(gameState.pChar, gameState.playerSkill)) {
+                    return false;
+                }
+                const demeritParam = getParamFromId(item.id);
+                return demeritParam !== meritParam; // Exclude if same parameter
+            });
+
+            // If no non-conflicting demerits available, use all available demerits
+            const demeritPool = availableDemerits.length > 0 ? availableDemerits : ITEM_EFFECTS.DEMERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
+            const demerit = demeritPool[Math.floor(Math.random() * demeritPool.length)];
+
             options.push({ type: 'item', merit, demerit });
         } else {
             const unownedSkills = SKILLS.filter(s => !gameState.playerSkill || s.id !== gameState.playerSkill.id);
