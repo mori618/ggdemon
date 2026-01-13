@@ -1,14 +1,86 @@
-import { CHARACTERS } from './constants.js';
+import { CHARACTERS, GAME_MODES, NETWORK_EVENTS } from './constants.js';
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
 import { setupBattleState, getCpuMove, executeTurn } from './game.js';
+import { network } from './network.js';
 
 window.onload = () => {
     lucide.createIcons();
     renderChars(handleCharSelect);
     loadHighStreak();
     syncAudioUI();
+};
+
+// Online UI Handlers
+window.showOnlineMenu = () => {
+    sound.playSE('click');
+    document.getElementById('title-screen').classList.add('hidden');
+    const onlineScreen = document.getElementById('online-screen');
+    onlineScreen.classList.remove('hidden');
+
+    // Reset to step 1
+    document.getElementById('online-step-1').classList.remove('hidden');
+    document.getElementById('online-step-host').classList.add('hidden');
+    document.getElementById('online-step-client').classList.add('hidden');
+};
+
+window.exitOnline = () => {
+    sound.playSE('click');
+    document.getElementById('online-screen').classList.add('hidden');
+    document.getElementById('online-step-connecting').classList.add('hidden');
+    document.getElementById('title-screen').classList.remove('hidden');
+    // Disconnect if active
+    if (network.peer) {
+        network.peer.destroy();
+        network.peer = null;
+    }
+};
+
+window.setupOnline = (role) => {
+    sound.playSE('click');
+    document.getElementById('online-step-1').classList.add('hidden');
+
+    if (role === 'HOST') {
+        document.getElementById('online-step-host').classList.remove('hidden');
+        network.init(true, (id) => {
+            document.getElementById('host-id-display').innerText = id;
+        });
+
+        network.setOnConnect((peerId) => {
+            console.log('Opponent connected:', peerId);
+            gameState.gameMode = GAME_MODES.ONLINE_HOST;
+            gameState.selectionState = 'PLAYER';
+            network.send(NETWORK_EVENTS.CONNECTED, {});
+            goToSelection(GAME_MODES.ONLINE_HOST);
+        });
+    } else {
+        document.getElementById('online-step-client').classList.remove('hidden');
+        // Client peer will be created when joining
+    }
+};
+
+window.joinRoom = () => {
+    const id = document.getElementById('join-id-input').value.trim().toLowerCase();
+    if (!id) return;
+    sound.playSE('click');
+
+    // Show connecting screen
+    document.getElementById('online-step-client').classList.add('hidden');
+    document.getElementById('online-step-connecting').classList.remove('hidden');
+    document.getElementById('connecting-room-id').innerText = id;
+
+    // Initialize peer for client and connect after it's ready
+    network.init(false, () => {
+        network.connect(id);
+    });
+
+    network.setOnConnect((peerId) => {
+        console.log('Connected to host:', peerId);
+        gameState.gameMode = GAME_MODES.ONLINE_CLIENT;
+        gameState.selectionState = 'PLAYER';
+        // Wait for host to send CONNECTED (or sending it ourselves is fine too)
+    });
 };
 
 // Global handlers (attached to window for HTML onclick attributes)
@@ -40,6 +112,8 @@ window.goToSelection = (mode) => {
     gameState.gameMode = mode;
     gameState.selectionState = 'PLAYER';
     document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('online-screen').classList.add('hidden');
+    document.getElementById('online-step-connecting').classList.add('hidden');
     document.getElementById('select-screen').classList.remove('hidden');
     document.getElementById('difficulty-selector').classList.add('hidden');
     document.getElementById('select-title').innerText = "Select Your Hero";
@@ -146,6 +220,27 @@ window.selectCommand = (c) => {
 
 window.confirmCommand = () => {
     if (!gameState.selectedCmd || gameState.isProc) return;
+
+    // Online Battle Handling
+    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+        if (gameState.myMoveCommitted) return; // Prevent double commit
+
+        sound.playSE('ready');
+        gameState.myMoveCommitted = true;
+        document.getElementById('command-wrapper').classList.add('ui-hidden');
+        showCommandDetail(null);
+        setMessage("Waiting for opponent...");
+
+        // 1. Send Commit
+        network.send(NETWORK_EVENTS.MOVE_COMMIT, {});
+
+        // 2. If opponent already committed, we can reveal our move now
+        if (gameState.opponentCommitted) {
+            network.send(NETWORK_EVENTS.MOVE_REVEAL, { move: gameState.selectedCmd });
+        }
+        return;
+    }
+
     gameState.isProc = true;
     sound.playSE('ready');
     document.getElementById('command-wrapper').classList.add('ui-hidden');
@@ -157,6 +252,23 @@ window.confirmCommand = () => {
 function handleCharSelect(id) {
     sound.playSE('click');
     let selected = (id === 'RANDOM') ? CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)] : CHARACTERS.find(c => c.id === id);
+
+    // Online Config Handling
+    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+        gameState.pChar = selected;
+        // Send selection to opponent
+        network.send(NETWORK_EVENTS.CHAR_SELECT, { charId: selected.id });
+
+        // Show waiting message
+        setMessage("Waiting for opponent...");
+        document.getElementById('select-title').innerText = "Waiting for Opponent...";
+        document.getElementById('char-grid').classList.add('pointer-events-none', 'opacity-50');
+
+        gameState.pSelected = true;
+        checkOnlineStart();
+        return;
+    }
+
     if (gameState.selectionState === 'PLAYER') {
         gameState.pChar = selected;
         if (gameState.gameMode === 'tower') {
@@ -172,6 +284,49 @@ function handleCharSelect(id) {
         startGame();
     }
 }
+
+function checkOnlineStart() {
+    if (gameState.pSelected && gameState.cSelected) {
+        setTimeout(() => {
+            startGame();
+        }, 500);
+    }
+}
+
+// Network Data Handler
+network.setOnData((data) => {
+    const { type, payload } = data;
+    console.log('CMD RECEIVED:', type, payload);
+
+    if (type === NETWORK_EVENTS.CONNECTED) {
+        if (gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+            goToSelection(GAME_MODES.ONLINE_CLIENT);
+        }
+    }
+    else if (type === NETWORK_EVENTS.CHAR_SELECT) {
+        const charId = payload.charId;
+        const selected = CHARACTERS.find(c => c.id === charId) || CHARACTERS[0]; // Fallback
+        gameState.cChar = selected;
+        gameState.cSelected = true;
+        checkOnlineStart();
+    }
+    else if (type === NETWORK_EVENTS.MOVE_COMMIT) {
+        // Opponent selected a move
+        gameState.opponentCommitted = true;
+        setMessage("Opponent Ready!");
+        // If I have also committed, exchange moves
+        if (gameState.myMoveCommitted) {
+            network.send(NETWORK_EVENTS.MOVE_REVEAL, { move: gameState.selectedCmd });
+        }
+    }
+    else if (type === NETWORK_EVENTS.MOVE_REVEAL) {
+        const opponentMove = payload.move;
+        executeTurn(gameState.selectedCmd, opponentMove);
+        gameState.opponentCommitted = false;
+        gameState.myMoveCommitted = false;
+        // gameState.selectedCmd is cleared in executeTurn
+    }
+});
 
 function startTower() {
     gameState.floor = 0;
