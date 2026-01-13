@@ -45,6 +45,13 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
         switch (playerSkill.id) {
             case 'CONVERT': pHP = Math.max(0, pHP - val1); pEnergy += val2; break;
             case 'DRAIN': cEnergy = Math.max(0, cEnergy - val1); break;
+            case 'SNATCH': {
+                const stolen = Math.min(cEnergy, val1);
+                cEnergy -= stolen;
+                pEnergy += stolen;
+                break;
+            } // New (True Steal)
+            case 'HEAL': pHP = Math.min(player.maxHp || 999, pHP + val1); break; // New (Capped at MaxHP)
             case 'INSPIRE': pEffects.push({ type: 'ATK_UP', amount: val2, turns: val1 + 1 }); break;
             case 'FOCUS': pEffects.push({ type: 'CHGE_UP', amount: val2, turns: val1 + 1 }); break;
             case 'WEAKEN': if (cpuMove === 'ATTACK') { cEffects.push({ type: 'ATK_DOWN', amount: val2, turns: val1 + 1 }); } break;
@@ -52,6 +59,7 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             case 'BARRIER': pEffects.push({ type: 'DMG_REDUCE', amount: val2, turns: val1 + 1 }); break;
             case 'PARALYZE': if (cpuMove === 'GUARD') { cEffects.push({ type: 'GRDC_UP', amount: val1, turns: 3 }); } break;
             case 'POISON': if (cpuMove !== 'GUARD') { cEffects.push({ type: 'POISON', trigger: val1, damage: val2, turns: 99 }); } break;
+            case 'DOOM': cEffects.push({ type: 'DOOM', damage: val2, turns: val1 }); break; // New (Correct timing)
         }
     }
 
@@ -107,6 +115,15 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
     pDmgTaken = Math.max(0, pDmgTaken - (player.tempDmgReduce || 0));
     cDmgTaken = Math.max(0, cDmgTaken - (cpu.tempDmgReduce || 0));
 
+    // Post-Damage Calculation (VAMPIRE)
+    if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'VAMPIRE') {
+        const skillEffectBonus = player.skillEffectBonus || 0;
+        const effectValues = playerSkill.effectValues.map(v => Math.max(1, v + skillEffectBonus));
+        const [rate] = effectValues; // rate is percentage (e.g. 50)
+        const healAmount = Math.floor(cDmgTaken * (rate / 100));
+        pHP = Math.min(player.maxHp || 999, pHP + healAmount);
+    }
+
     pHP = Math.max(0, pHP - pDmgTaken);
     cHP = Math.max(0, cHP - cDmgTaken);
 
@@ -116,11 +133,14 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
 }
 
 export function updateEffects(effects) {
-    const updated = effects.map(e => ({ ...e, turns: e.turns - 1 })).filter(e => e.turns > 0);
+    const nextEffects = effects.map(e => ({ ...e, turns: e.turns - 1 }));
+    const active = nextEffects.filter(e => e.turns > 0);
+    const expired = nextEffects.filter(e => e.turns <= 0);
+
     const totals = {
         tempAtk: 0, tempGrdC: 0, tempChgE: 0, tempChgC: 0, tempDmgReduce: 0
     };
-    updated.forEach(effect => {
+    active.forEach(effect => {
         if (effect.type === 'ATK_UP') totals.tempAtk += effect.amount;
         if (effect.type === 'ATK_DOWN') totals.tempAtk -= effect.amount;
         if (effect.type === 'GRDC_UP') totals.tempGrdC += effect.amount;
@@ -129,7 +149,7 @@ export function updateEffects(effects) {
         if (effect.type === 'CHARGE_COST_UP') totals.tempChgC += effect.amount;
         if (effect.type === 'DMG_REDUCE') totals.tempDmgReduce += effect.amount;
     });
-    return { effects: updated, totals };
+    return { effects: active, expired, totals };
 }
 
 export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory }) {

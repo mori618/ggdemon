@@ -1,13 +1,13 @@
 export const CHARACTERS = [
-    { id: 'NORMAL', name: 'Normal', hp: 3, atk: 1, winE: 5, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'user', tagline: 'バランスに優れた標準モデル' },
-    { id: 'STRIKER', name: 'Striker', hp: 2, atk: 3, winE: 6, chgE: 1, grdC: 0, atkC: 2, chgC: 0, startE: 1, icon: 'zap', tagline: '2ターン目の処刑人' },
-    { id: 'TACTICIAN', name: 'Tactician', hp: 3, atk: 1, winE: 12, chgE: 2, grdC: 1, atkC: 1, chgC: 0, startE: 1, icon: 'brain', tagline: '戦略の幅を持つ技巧派' },
-    { id: 'TANK', name: 'Tank', hp: 5, atk: 1, winE: 8, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'shield', tagline: '鉄壁の防御で機を待つ重装甲' },
-    { id: 'ASSASSIN', name: 'Assassin', hp: 2, atk: 1, winE: 4, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'target', tagline: '電光石火の速攻モデル' },
-    { id: 'BERSERKER', name: 'Berserker', hp: 1, atk: 6, winE: 10, chgE: 1, grdC: 0, atkC: 4, chgC: 0, startE: 2, icon: 'flame', tagline: '全てを破壊する究極の矛' },
-    { id: 'SAGE', name: 'Sage', hp: 2, atk: 1, winE: 15, chgE: 3, grdC: 1, atkC: 2, chgC: 0, startE: 3, icon: 'wand-2', tagline: '準備時間の短縮に成功した魔導師' },
-    { id: 'REVENGER', name: 'Revenger', hp: 3, atk: 2, winE: 7, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'swords', tagline: '相殺を制するカウンターモデル' },
-    { id: 'OVERDRIVE', name: 'Overdrive', hp: 2, atk: 2, winE: 10, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 6, icon: 'battery-charging', tagline: '高出力の先制オーバークロック' }
+    { id: 'NORMAL', name: 'Normal', hp: 3, atk: 1, winE: 5, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'user', tagline: 'ノーマルタイプ' },
+    { id: 'STRIKER', name: 'Striker', hp: 2, atk: 3, winE: 6, chgE: 1, grdC: 0, atkC: 2, chgC: 0, startE: 1, icon: 'zap', tagline: '猛撃の処刑人' },
+    { id: 'TACTICIAN', name: 'Tactician', hp: 3, atk: 1, winE: 12, chgE: 2, grdC: 1, atkC: 1, chgC: 0, startE: 3, icon: 'brain', tagline: '技巧派軍師' },
+    { id: 'TANK', name: 'Tank', hp: 5, atk: 1, winE: 8, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'shield', tagline: '鉄壁の守護者' },
+    { id: 'ASSASSIN', name: 'Assassin', hp: 2, atk: 1, winE: 4, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'target', tagline: '電光石火の暗殺者' },
+    { id: 'BERSERKER', name: 'Berserker', hp: 1, atk: 6, winE: 10, chgE: 1, grdC: 0, atkC: 4, chgC: 0, startE: 2, icon: 'flame', tagline: '全てを破壊する矛' },
+    { id: 'SAGE', name: 'Sage', hp: 2, atk: 1, winE: 15, chgE: 3, grdC: 1, atkC: 2, chgC: 0, startE: 3, icon: 'wand-2', tagline: '身軽な魔導師' },
+    { id: 'REVENGER', name: 'Revenger', hp: 3, atk: 2, winE: 7, chgE: 1, grdC: 0, atkC: 1, chgC: 0, startE: 0, icon: 'swords', tagline: '相殺を制するカウンター' },
+    { id: 'OVERDRIVE', name: 'Overdrive', hp: 2, atk: 2, winE: 10, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 6, icon: 'battery-charging', tagline: 'オーバークロック' }
 ];
 
 export const ENEMY_TRAITS = [
@@ -20,7 +20,10 @@ export const ENEMY_TRAITS = [
 
 export const BOSS_CHARACTERS = [
     { id: 'VOID_EATER', name: 'Void Eater', hp: 15, atk: 2, winE: 20, chgE: 4, grdC: 0, atkC: 2, chgC: 1, startE: 5, icon: 'ghost', tagline: '全てを無に帰すタワーの支配者' },
-    { id: 'CORE_TITAN', name: 'Core Titan', hp: 25, atk: 4, winE: 15, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 0, icon: 'database', tagline: '一撃必殺のチャージを蓄える巨像' }
+    { id: 'CORE_TITAN', name: 'Core Titan', hp: 25, atk: 4, winE: 15, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 0, icon: 'database', tagline: '一撃必殺のチャージを蓄える巨像' },
+    { id: 'FALLEN_KING', name: 'Fallen King', hp: 20, atk: 3, winE: 18, chgE: 2, grdC: 1, atkC: 2, chgC: 0, startE: 2, icon: 'crown', tagline: 'かつて栄華を極めた堕落の王' },
+    { id: 'STORM_BRINGER', name: 'Storm Bringer', hp: 12, atk: 2, winE: 10, chgE: 5, grdC: 0, atkC: 1, chgC: 0, startE: 4, icon: 'cloud-lightning', tagline: '嵐を呼ぶ天空の覇者' },
+    { id: 'ABYSS_WATCHER', name: 'Abyss Watcher', hp: 30, atk: 2, winE: 12, chgE: 1, grdC: 0, atkC: 2, chgC: 0, startE: 0, icon: 'eye', tagline: '深淵を覗き込む異形の存在' }
 ];
 
 export const TREASURE_MONSTER = { id: 'TREASURE_CHEST', name: 'Treasure', hp: 1, atk: 7, winE: 10, chgE: 1, grdC: 10, atkC: 7, chgC: 0, startE: 0, icon: 'gift', tagline: '中にはお宝が詰まっているようだ' };
@@ -38,7 +41,11 @@ export const SKILLS = [
     { id: 'PIERCE', name: 'ガード貫通', category: 'ATTACK', description: '敵がガードしていた場合のみ ? ダメージを与える。', costRange: [1, 3], effectRanges: [[2, 3]] },
     { id: 'INSPIRE', name: '鼓舞', category: 'CHARGE', description: '? ターンの間、自分のATKを ? アップ。', costRange: [2, 4], effectRanges: [[2, 3], [1, 1]] },
     { id: 'FOCUS', name: '集中', category: 'CHARGE', description: '? ターンの間、自分のチャージ増加量を ? アップ。', costRange: [2, 4], effectRanges: [[2, 3], [1, 1]] },
-    { id: 'SHOCK', name: '衝撃', category: 'ATTACK', description: '敵の行動に関わらず、固定で 1 ダメージ与える。', costRange: [3, 5], effectRanges: [[1, 1]] }
+    { id: 'SHOCK', name: '衝撃', category: 'ATTACK', description: '敵の行動に関わらず、固定で 1 ダメージ与える。', costRange: [3, 5], effectRanges: [[1, 1]] },
+    { id: 'HEAL', name: 'ヒール', category: 'CHARGE', description: 'HPを ? 回復する。', costRange: [3, 5], effectRanges: [[2, 4]] },
+    { id: 'SNATCH', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪う。', costRange: [2, 4], effectRanges: [[1, 2]] },
+    { id: 'VAMPIRE', name: '吸血', category: 'ATTACK', description: '与えたダメージの ?% を回復する。', costRange: [3, 5], effectRanges: [[50, 100]] },
+    { id: 'DOOM', name: '死の宣告', category: 'SPECIAL', description: '? ターン後に ? ダメージを与える時限爆弾を付与。', costRange: [3, 5], effectRanges: [[2, 3], [5, 8]] }
 ];
 
 export const ITEM_EFFECTS = {
@@ -75,5 +82,6 @@ export const EFFECT_ICONS = {
     'CHGE_DOWN': { icon: 'zap', color: 'text-slate-500' },
     'ATK_DOWN': { icon: 'sword', color: 'text-slate-500' },
     'DMG_REDUCE': { icon: 'shield-check', color: 'text-emerald-400' },
-    'POISON': { icon: 'biohazard', color: 'text-lime-400' }
+    'POISON': { icon: 'biohazard', color: 'text-lime-400' },
+    'DOOM': { icon: 'skull', color: 'text-purple-600' }
 };

@@ -9,7 +9,7 @@ export function setupBattleState() {
     gameState.player.effects = [];
     gameState.player.tempAtk = gameState.player.tempGrdC = gameState.player.tempChgE = gameState.player.tempChgC = gameState.player.tempDmgReduce = 0;
 
-    const isBoss = (gameState.gameMode === 'tower' && gameState.floor % 5 === 0);
+    const isBoss = (gameState.gameMode === 'tower' || true); // TEMPORARY TESTING: Force boss encounter
     let baseCpu;
 
     if (gameState.gameMode === 'tower') {
@@ -128,13 +128,37 @@ export function getCpuMove() {
 
 export function executeTurn(pM, cM) {
     // 1. Update Effects
+    // 1. Update Effects
     const pUpdate = updateEffects(gameState.player.effects);
     gameState.player.effects = pUpdate.effects;
     Object.assign(gameState.player, pUpdate.totals);
 
+    // Handle Expired Effects (Player)
+    if (pUpdate.expired) {
+        pUpdate.expired.forEach(ex => {
+            if (ex.type === 'DOOM') {
+                gameState.pHP = Math.max(0, gameState.pHP - ex.damage);
+                gameState.player.hp = gameState.pHP; // Sync
+                // Optional: Sound or Visual for Doom triggering
+                sound.playSE('clash'); // Generic damage sound for now
+            }
+        });
+    }
+
     const cUpdate = updateEffects(gameState.cpu.effects);
     gameState.cpu.effects = cUpdate.effects;
     Object.assign(gameState.cpu, cUpdate.totals);
+
+    // Handle Expired Effects (CPU)
+    if (cUpdate.expired) {
+        cUpdate.expired.forEach(ex => {
+            if (ex.type === 'DOOM') {
+                gameState.cHP = Math.max(0, gameState.cHP - ex.damage);
+                gameState.cpu.hp = gameState.cHP; // Sync
+                sound.playSE('clash');
+            }
+        });
+    }
 
     gameState.playerHistory.push(pM);
     if (gameState.playerHistory.length > 5) gameState.playerHistory.shift();
@@ -172,7 +196,7 @@ export function executeTurn(pM, cM) {
     setTimeout(() => {
         // 2. Calculate Result
         const result = calculateTurnResult(
-            { ...gameState.player, energy: gameState.pEnergy, hp: gameState.pHP },
+            { ...gameState.player, energy: gameState.pEnergy, hp: gameState.pHP, maxHp: gameState.player.hp },
             { ...gameState.cpu, energy: gameState.cEnergy, hp: gameState.cHP },
             pM, cM, gameState.playerSkill
         );
