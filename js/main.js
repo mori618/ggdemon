@@ -28,6 +28,7 @@ window.showOnlineMenu = () => {
 window.exitOnline = () => {
     sound.playSE('click');
     document.getElementById('online-screen').classList.add('hidden');
+    document.getElementById('online-step-connecting').classList.add('hidden');
     document.getElementById('title-screen').classList.remove('hidden');
     // Disconnect if active
     if (network.peer) {
@@ -55,16 +56,25 @@ window.setupOnline = (role) => {
         });
     } else {
         document.getElementById('online-step-client').classList.remove('hidden');
-        network.init(false);
+        // Client peer will be created when joining
     }
 };
 
 window.joinRoom = () => {
-    const id = document.getElementById('join-id-input').value.trim();
+    const id = document.getElementById('join-id-input').value.trim().toLowerCase();
     if (!id) return;
     sound.playSE('click');
 
-    network.connect(id);
+    // Show connecting screen
+    document.getElementById('online-step-client').classList.add('hidden');
+    document.getElementById('online-step-connecting').classList.remove('hidden');
+    document.getElementById('connecting-room-id').innerText = id;
+
+    // Initialize peer for client and connect after it's ready
+    network.init(false, () => {
+        network.connect(id);
+    });
+
     network.setOnConnect((peerId) => {
         console.log('Connected to host:', peerId);
         gameState.gameMode = GAME_MODES.ONLINE_CLIENT;
@@ -72,20 +82,6 @@ window.joinRoom = () => {
         // Wait for host to send CONNECTED (or sending it ourselves is fine too)
     });
 };
-
-// Network Data Handler
-network.setOnData((data) => {
-    const { type, payload } = data;
-    console.log('CMD RECEIVED:', type, payload);
-
-    if (type === NETWORK_EVENTS.CONNECTED) {
-        // Transition to Char Select
-        if (gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-            goToSelection(GAME_MODES.ONLINE_CLIENT);
-        }
-    }
-    // ... we will add more handlers here later
-});
 
 // Global handlers (attached to window for HTML onclick attributes)
 window.toggleMute = () => {
@@ -116,6 +112,8 @@ window.goToSelection = (mode) => {
     gameState.gameMode = mode;
     gameState.selectionState = 'PLAYER';
     document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('online-screen').classList.add('hidden');
+    document.getElementById('online-step-connecting').classList.add('hidden');
     document.getElementById('select-screen').classList.remove('hidden');
     document.getElementById('difficulty-selector').classList.add('hidden');
     document.getElementById('select-title').innerText = "Select Your Hero";

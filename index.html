@@ -131,255 +131,271 @@
                 </div>
             </section>
         </div>
-        <!-- Screen: Online Connection -->
-        <div id="online-screen"
-            class="fixed inset-0 z-[120] flex flex-col items-center justify-center p-6 bg-slate-950 hidden text-white">
-            <h2
-                class="text-3xl font-black font-orbitron text-center mb-8 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent italic tracking-tighter uppercase">
-                Online Battle</h2>
+    </div>
+    <!-- Screen: Online Connection -->
+    <div id="online-screen"
+        class="fixed inset-0 z-[120] flex flex-col items-center justify-center p-6 bg-slate-950 hidden text-white">
+        <h2
+            class="text-3xl font-black font-orbitron text-center mb-8 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent italic tracking-tighter uppercase">
+            Online Battle</h2>
 
-            <!-- Step 1: Mode Select -->
-            <div id="online-step-1" class="flex flex-col space-y-4 w-full max-w-[280px]">
-                <button onclick="setupOnline('HOST')"
-                    class="bg-emerald-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">Create
-                    Room</button>
-                <button onclick="setupOnline('CLIENT')"
-                    class="bg-sky-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">Join
-                    Room</button>
-                <button onclick="exitOnline()"
-                    class="bg-slate-800 text-slate-300 py-4 rounded-2xl font-black font-orbitron text-lg hover:bg-slate-700 active:scale-95 transition-all uppercase w-full">Back</button>
-            </div>
-
-            <!-- Step 2: Host Waiting -->
-            <div id="online-step-host" class="hidden flex flex-col items-center w-full max-w-md">
-                <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Your Room ID</p>
-                <div class="bg-slate-900 border-2 border-blue-500 rounded-xl p-6 mb-6 w-full text-center relative">
-                    <span id="host-id-display"
-                        class="font-orbitron text-4xl font-black text-white tracking-widest text-shadow-glow">???</span>
-                    <p class="text-[10px] text-slate-500 mt-2">Share this ID with your opponent</p>
-                </div>
-                <div class="flex items-center gap-3 mb-8">
-                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Waiting for
-                        opponent...</span>
-                </div>
-                <button onclick="exitOnline()"
-                    class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
-            </div>
-
-            <!-- Step 2: Client Join -->
-            <div id="online-step-client" class="hidden flex flex-col items-center w-full max-w-md">
-                <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Enter Room ID</p>
-                <input type="text" id="join-id-input" placeholder="e.g. gg-abcd"
-                    class="bg-slate-900 border-2 border-slate-700 rounded-xl p-4 mb-6 w-full text-center font-orbitron text-2xl font-bold text-white focus:border-blue-500 outline-none uppercase placeholder:text-slate-700">
-
-                <button onclick="joinRoom()"
-                    class="w-full bg-blue-600 text-white py-4 rounded-xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase mb-4">Connect</button>
-                <button onclick="exitOnline()"
-                    class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
-            </div>
-        </div>
-        <div id="char-status-overlay" onclick="closeStatusOverlay()">
-            <div class="status-overlay-content" onclick="event.stopPropagation()">
-                <div id="status-display-box"
-                    class="bg-slate-900 border-4 border-slate-700 p-8 rounded-[3rem] shadow-2xl relative text-center">
-                    <button onclick="closeStatusOverlay()"
-                        class="absolute top-6 right-6 text-slate-500 hover:text-white"><i data-lucide="x"></i></button>
-                    <div id="status-info-content"></div>
-                </div>
-            </div>
+        <!-- Step 1: Mode Select -->
+        <div id="online-step-1" class="flex flex-col space-y-4 w-full max-w-[280px]">
+            <button onclick="setupOnline('HOST')"
+                class="bg-emerald-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">Create
+                Room</button>
+            <button onclick="setupOnline('CLIENT')"
+                class="bg-sky-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">Join
+                Room</button>
+            <button onclick="exitOnline()"
+                class="bg-slate-800 text-slate-300 py-4 rounded-2xl font-black font-orbitron text-lg hover:bg-slate-700 active:scale-95 transition-all uppercase w-full">Back</button>
         </div>
 
-        <!-- Pause Menu -->
-        <div id="pause-overlay"
-            class="fixed inset-0 z-[180] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
-            <div
-                class="w-full max-w-xs flex flex-col space-y-4 p-8 bg-slate-900 border-4 border-slate-800 rounded-[3rem] shadow-2xl text-center">
-                <h2 class="text-3xl font-black italic font-orbitron mb-2 text-white uppercase">Paused</h2>
-                <div class="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 mb-4 text-white">
-                    <div class="flex justify-between items-center mb-2">
-                        <span
-                            class="text-[10px] font-black text-slate-500 font-orbitron uppercase tracking-widest">Volume</span>
-                        <span class="sync-vol-text text-[10px] font-black text-sky-400 font-orbitron">50%</span>
+        <!-- Step 2: Host Waiting -->
+        <div id="online-step-host" class="hidden flex flex-col items-center w-full max-w-md">
+            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Your Room ID</p>
+            <div class="bg-slate-900 border-2 border-blue-500 rounded-xl p-6 mb-6 w-full text-center relative">
+                <span id="host-id-display"
+                    class="font-orbitron text-4xl font-black text-white tracking-widest text-shadow-glow">???</span>
+                <p class="text-[10px] text-slate-500 mt-2">Share this ID with your opponent</p>
+            </div>
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Waiting for
+                    opponent...</span>
+            </div>
+            <button onclick="exitOnline()"
+                class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+        </div>
+
+        <!-- Step 2: Client Join -->
+        <div id="online-step-client" class="hidden flex flex-col items-center w-full max-w-md">
+            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Enter Room ID</p>
+            <input type="text" id="join-id-input" placeholder="e.g. gg-abcd"
+                class="bg-slate-900 border-2 border-slate-700 rounded-xl p-4 mb-6 w-full text-center font-orbitron text-2xl font-bold text-white focus:border-blue-500 outline-none uppercase placeholder:text-slate-700">
+
+            <button onclick="joinRoom()"
+                class="w-full bg-blue-600 text-white py-4 rounded-xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase mb-4">Connect</button>
+            <button onclick="exitOnline()"
+                class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+        </div>
+
+        <!-- Step 3: Client Connecting -->
+        <div id="online-step-connecting" class="hidden flex flex-col items-center w-full max-w-md">
+            <div class="mb-6">
+                <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Connecting to</p>
+            <p id="connecting-room-id" class="font-orbitron text-2xl font-black text-white mb-6">gg-????</p>
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                <span class="text-xs font-bold text-blue-400 uppercase tracking-widest animate-pulse">Searching for
+                    opponent...</span>
+            </div>
+            <button onclick="exitOnline()"
+                class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+        </div>
+    </div>
+    <div id="char-status-overlay" onclick="closeStatusOverlay()">
+        <div class="status-overlay-content" onclick="event.stopPropagation()">
+            <div id="status-display-box"
+                class="bg-slate-900 border-4 border-slate-700 p-8 rounded-[3rem] shadow-2xl relative text-center">
+                <button onclick="closeStatusOverlay()" class="absolute top-6 right-6 text-slate-500 hover:text-white"><i
+                        data-lucide="x"></i></button>
+                <div id="status-info-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-overlay"
+        class="fixed inset-0 z-[180] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div
+            class="w-full max-w-xs flex flex-col space-y-4 p-8 bg-slate-900 border-4 border-slate-800 rounded-[3rem] shadow-2xl text-center">
+            <h2 class="text-3xl font-black italic font-orbitron mb-2 text-white uppercase">Paused</h2>
+            <div class="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 mb-4 text-white">
+                <div class="flex justify-between items-center mb-2">
+                    <span
+                        class="text-[10px] font-black text-slate-500 font-orbitron uppercase tracking-widest">Volume</span>
+                    <span class="sync-vol-text text-[10px] font-black text-sky-400 font-orbitron">50%</span>
+                </div>
+                <input type="range" min="0" max="100" value="50" class="vol-slider sync-vol-slider"
+                    oninput="changeVolume(this.value)">
+            </div>
+            <button onclick="togglePause()"
+                class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">続ける</button>
+            <button onclick="retryGame()"
+                class="w-full bg-sky-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">リトライ</button>
+            <button onclick="restartApp()"
+                class="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">タイトルへ</button>
+        </div>
+    </div>
+
+    <!-- Game Header UI -->
+    <header class="w-full max-w-2xl mx-auto flex justify-between items-center p-4 z-30 flex-shrink-0">
+        <div class="flex flex-col text-white">
+            <h1
+                class="text-xs font-black font-orbitron bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent uppercase tracking-wider">
+                G.G Demon</h1>
+            <div id="tower-indicator" class="hidden mt-1"><span
+                    class="streak-badge text-[10px] font-orbitron uppercase tracking-widest text-white">FLOOR <span
+                        id="current-floor-val">1</span> / BOSS IN <span id="boss-in-val">10</span></span></div>
+        </div>
+        <div class="flex gap-2">
+            <button id="sound-btn" onclick="toggleMute()"
+                class="p-2 bg-slate-900 border-2 border-slate-800 rounded-xl transition-all"><i id="mute-icon"
+                    data-lucide="volume-x" class="w-5 h-5 text-white"></i></button>
+            <button onclick="togglePause()" class="p-2 bg-slate-900 border-2 border-slate-800 rounded-xl"><i
+                    data-lucide="pause" class="w-5 h-5 text-white"></i></button>
+        </div>
+    </header>
+
+    <main class="flex-grow w-full max-w-4xl mx-auto flex flex-row items-center justify-around relative px-2">
+        <!-- Player -->
+        <div class="flex flex-col items-center w-1/3">
+            <div id="player-card" onclick="openStatusOverlay('PLAYER')"
+                class="char-card-clickable w-32 h-32 md:w-40 md:h-40 bg-blue-500/10 rounded-[2.5rem] border-4 border-blue-500/30 flex items-center justify-center shadow-2xl relative transition-all">
+                <div id="player-icon-container"></div>
+                <div class="absolute -top-6 left-0 right-0">
+                    <div id="player-hp-text" class="hp-text uppercase">HP 0 / 0</div>
+                    <div class="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700 mt-1">
+                        <div id="player-hp-bar" class="hp-fill h-full bg-emerald-500 w-full"></div>
                     </div>
-                    <input type="range" min="0" max="100" value="50" class="vol-slider sync-vol-slider"
-                        oninput="changeVolume(this.value)">
                 </div>
-                <button onclick="togglePause()"
-                    class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">続ける</button>
-                <button onclick="retryGame()"
-                    class="w-full bg-sky-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">リトライ</button>
-                <button onclick="restartApp()"
-                    class="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">タイトルへ</button>
             </div>
+
+            <div id="player-effects-display" class="flex gap-2 mt-2 h-6"></div>
+            <div class="status-info-bar text-white"><i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i><span
+                    id="player-chge-val">1</span>
+                <div class="status-info-divider"></div><i data-lucide="sword" class="w-3 h-3 text-rose-400"></i><span
+                    id="player-atk-val">1</span>
+                <div class="status-info-divider"></div><i data-lucide="battery"
+                    class="w-3 h-3 text-yellow-400"></i><span id="player-cost-val">1</span>
+            </div>
+            <div id="player-energy-bar" class="flex flex-wrap gap-1 justify-center max-w-[140px]"></div>
+            <span id="player-name-label"
+                class="text-[10px] md:text-xs font-black text-blue-400 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">PLAYER</span>
         </div>
 
-        <!-- Game Header UI -->
-        <header class="w-full max-w-2xl mx-auto flex justify-between items-center p-4 z-30 flex-shrink-0">
-            <div class="flex flex-col text-white">
-                <h1
-                    class="text-xs font-black font-orbitron bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent uppercase tracking-wider">
-                    G.G Demon</h1>
-                <div id="tower-indicator" class="hidden mt-1"><span
-                        class="streak-badge text-[10px] font-orbitron uppercase tracking-widest text-white">FLOOR <span
-                            id="current-floor-val">1</span> / BOSS IN <span id="boss-in-val">10</span></span></div>
-            </div>
-            <div class="flex gap-2">
-                <button id="sound-btn" onclick="toggleMute()"
-                    class="p-2 bg-slate-900 border-2 border-slate-800 rounded-xl transition-all"><i id="mute-icon"
-                        data-lucide="volume-x" class="w-5 h-5 text-white"></i></button>
-                <button onclick="togglePause()" class="p-2 bg-slate-900 border-2 border-slate-800 rounded-xl"><i
-                        data-lucide="pause" class="w-5 h-5 text-white"></i></button>
-            </div>
-        </header>
+        <div
+            class="flex flex-col items-center justify-center z-20 w-1/4 h-full relative text-slate-800 pointer-events-none">
+            <!-- コマンド詳細 -->
+            <div id="command-detail-view"
+                class="absolute top-1/2 -translate-y-3/4 w-full flex items-center justify-center z-50"></div>
+        </div>
 
-        <main class="flex-grow w-full max-w-4xl mx-auto flex flex-row items-center justify-around relative px-2">
-            <!-- Player -->
-            <div class="flex flex-col items-center w-1/3">
-                <div id="player-card" onclick="openStatusOverlay('PLAYER')"
-                    class="char-card-clickable w-32 h-32 md:w-40 md:h-40 bg-blue-500/10 rounded-[2.5rem] border-4 border-blue-500/30 flex items-center justify-center shadow-2xl relative transition-all">
-                    <div id="player-icon-container"></div>
-                    <div class="absolute -top-6 left-0 right-0">
-                        <div id="player-hp-text" class="hp-text uppercase">HP 0 / 0</div>
-                        <div class="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700 mt-1">
-                            <div id="player-hp-bar" class="hp-fill h-full bg-emerald-500 w-full"></div>
-                        </div>
+
+
+        <!-- CPU -->
+        <div class="flex flex-col items-center w-1/3">
+            <div id="cpu-card" onclick="openStatusOverlay('CPU')"
+                class="char-card-clickable w-32 h-32 md:w-40 md:h-40 bg-rose-500/10 rounded-[2.5rem] border-4 border-rose-500/20 flex items-center justify-center shadow-2xl relative transition-all">
+                <div id="cpu-icon-container"></div>
+                <div class="absolute -top-6 left-0 right-0">
+                    <div id="cpu-hp-text" class="hp-text uppercase">HP 0 / 0</div>
+                    <div class="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700 mt-1">
+                        <div id="cpu-hp-bar" class="hp-fill h-full bg-rose-500 w-full"></div>
                     </div>
                 </div>
 
-                <div id="player-effects-display" class="flex gap-2 mt-2 h-6"></div>
-                <div class="status-info-bar text-white"><i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i><span
-                        id="player-chge-val">1</span>
-                    <div class="status-info-divider"></div><i data-lucide="sword"
-                        class="w-3 h-3 text-rose-400"></i><span id="player-atk-val">1</span>
-                    <div class="status-info-divider"></div><i data-lucide="battery"
-                        class="w-3 h-3 text-yellow-400"></i><span id="player-cost-val">1</span>
-                </div>
-                <div id="player-energy-bar" class="flex flex-wrap gap-1 justify-center max-w-[140px]"></div>
-                <span id="player-name-label"
-                    class="text-[10px] md:text-xs font-black text-blue-400 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">PLAYER</span>
+                <div id="cpu-level-badge"
+                    class="absolute -bottom-2 -right-2 bg-rose-600 text-white text-[8px] font-black px-2 py-0.5 rounded italic font-orbitron hidden uppercase tracking-widest">
+                    LV.1</div>
             </div>
-
-            <div
-                class="flex flex-col items-center justify-center z-20 w-1/4 h-full relative text-slate-800 pointer-events-none">
-                <!-- コマンド詳細 -->
-                <div id="command-detail-view"
-                    class="absolute top-1/2 -translate-y-3/4 w-full flex items-center justify-center z-50"></div>
+            <div id="cpu-effects-display" class="flex gap-2 mt-2 h-6"></div>
+            <div class="status-info-bar text-white"><i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i><span
+                    id="cpu-chge-val">1</span>
+                <div class="status-info-divider"></div><i data-lucide="sword" class="w-3 h-3 text-rose-400"></i><span
+                    id="cpu-atk-val">1</span>
+                <div class="status-info-divider"></div><i data-lucide="battery"
+                    class="w-3 h-3 text-yellow-400"></i><span id="cpu-cost-val">1</span>
             </div>
-
-
-
-            <!-- CPU -->
-            <div class="flex flex-col items-center w-1/3">
-                <div id="cpu-card" onclick="openStatusOverlay('CPU')"
-                    class="char-card-clickable w-32 h-32 md:w-40 md:h-40 bg-rose-500/10 rounded-[2.5rem] border-4 border-rose-500/20 flex items-center justify-center shadow-2xl relative transition-all">
-                    <div id="cpu-icon-container"></div>
-                    <div class="absolute -top-6 left-0 right-0">
-                        <div id="cpu-hp-text" class="hp-text uppercase">HP 0 / 0</div>
-                        <div class="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700 mt-1">
-                            <div id="cpu-hp-bar" class="hp-fill h-full bg-rose-500 w-full"></div>
-                        </div>
-                    </div>
-
-                    <div id="cpu-level-badge"
-                        class="absolute -bottom-2 -right-2 bg-rose-600 text-white text-[8px] font-black px-2 py-0.5 rounded italic font-orbitron hidden uppercase tracking-widest">
-                        LV.1</div>
-                </div>
-                <div id="cpu-effects-display" class="flex gap-2 mt-2 h-6"></div>
-                <div class="status-info-bar text-white"><i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i><span
-                        id="cpu-chge-val">1</span>
-                    <div class="status-info-divider"></div><i data-lucide="sword"
-                        class="w-3 h-3 text-rose-400"></i><span id="cpu-atk-val">1</span>
-                    <div class="status-info-divider"></div><i data-lucide="battery"
-                        class="w-3 h-3 text-yellow-400"></i><span id="cpu-cost-val">1</span>
-                </div>
-                <div id="cpu-energy-bar" class="flex flex-wrap gap-1 justify-center max-w-[140px]"></div>
-                <span id="cpu-name-label"
-                    class="text-[10px] md:text-xs font-black text-rose-500/60 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">CPU</span>
-            </div>
-        </main>
-
-        <!-- Footer Commands -->
-        <footer id="footer-ui-container" class="flex-shrink-0">
-            <div id="command-wrapper">
-                <div id="game-message-container">
-                    <p id="game-message"
-                        class="text-white font-black text-xl font-orbitron italic tracking-widest uppercase"></p>
-                </div>
-
-                <!-- Ready Button (Restored) -->
-                <div class="w-full flex justify-center mb-2">
-                    <button id="btn-ready" onclick="confirmCommand()" disabled
-                        class="ready-btn w-64 py-3 bg-white text-slate-950 rounded-xl font-black text-xl uppercase shadow-[0_0_20px_rgba(255,255,255,0.4)] transition-all active:scale-95 disabled:opacity-0 disabled:pointer-events-none font-orbitron tracking-widest hover:bg-slate-200">
-                        Ready
-                    </button>
-                </div>
-
-                <!-- コマンドエリア -->
-                <div class="flex space-x-3 items-end mb-4 pt-4">
-                    <button id="cmd-CHARGE" onclick="selectCommand('CHARGE')" class="command-btn btn-charge"><span
-                            class="stat-badge" id="badge-charge-val">0</span><i data-lucide="zap"
-                            class="w-8 h-8"></i><span class="effect-label" id="eff-charge">+1</span></button>
-                    <button id="cmd-ATTACK" onclick="selectCommand('ATTACK')" class="command-btn btn-attack"><span
-                            class="stat-badge" id="badge-attack-val">1</span><i data-lucide="sword"
-                            class="w-8 h-8"></i><span class="effect-label" id="eff-attack">1 DMG</span></button>
-                    <button id="cmd-GUARD" onclick="selectCommand('GUARD')" class="command-btn btn-guard"><span
-                            class="stat-badge" id="badge-guard-val">0</span><i data-lucide="shield"
-                            class="w-8 h-8"></i><span class="effect-label" id="eff-guard">BLOCK</span></button>
-                    <button id="cmd-SKILL" onclick="selectCommand('SKILL')" class="command-btn btn-skill"><span
-                            class="stat-badge" id="badge-skill-val">?</span><i data-lucide="star"
-                            class="w-8 h-8"></i><span class="effect-label" id="eff-skill">SKILL</span></button>
-                </div>
-
-                <div class="mt-2 font-orbitron text-[10px] font-black text-slate-700 tracking-[0.2em]">TURN <span
-                        id="turn-display">1</span></div>
-            </div>
-        </footer>
-
-        <!-- Result -->
-        <div id="result-overlay"
-            class="fixed inset-0 z-[150] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-500">
-            <div
-                class="w-full max-w-xs flex flex-col items-center p-10 bg-slate-900 border-4 border-slate-800 rounded-[3rem] shadow-2xl text-center text-white">
-                <h2 id="result-title" class="text-4xl font-black italic font-orbitron mb-4 uppercase tracking-tighter">
-                    Result</h2>
-                <p id="result-desc" class="text-slate-400 mb-8 font-bold text-sm uppercase"></p>
-                <div id="streak-result-box" class="mb-8 hidden">
-                    <div class="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 font-orbitron">Win
-                        Streak
-                    </div>
-                    <div id="final-streak-val" class="text-5xl font-black font-orbitron text-rose-500">0</div>
-                </div>
-                <button id="btn-next-stage" onclick="nextStage()"
-                    class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase text-lg active:scale-95 mb-3 hidden uppercase">Next
-                    Enemy</button>
-                <button onclick="restartApp()"
-                    class="w-full bg-white text-slate-950 py-4 rounded-xl font-black uppercase text-lg active:scale-95 transition-all">タイトルへ戻る</button>
-            </div>
+            <div id="cpu-energy-bar" class="flex flex-wrap gap-1 justify-center max-w-[140px]"></div>
+            <span id="cpu-name-label"
+                class="text-[10px] md:text-xs font-black text-rose-500/60 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">CPU</span>
         </div>
+    </main>
 
-        <!-- Battle Dialog Overlay -->
-        <div id="battle-dialog-overlay"
-            class="fixed inset-0 z-[100] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
-            <!-- Content injected by JS -->
-        </div>
-
-        <!-- Treasure Chest Overlay -->
-        <div id="treasure-overlay"
-            class="fixed inset-0 z-[160] overlay-bg flex-col items-center justify-start hidden opacity-0 transition-opacity duration-500 p-4 pt-12 pb-12 overflow-y-auto">
-            <div class="flex flex-col items-center text-center mb-8">
-                <i data-lucide="gem"
-                    class="w-16 h-16 text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.7)] mb-3"></i>
-                <h2 class="text-3xl font-black italic font-orbitron uppercase tracking-tighter text-white">Choose Your
-                    Reward</h2>
-                <p class="text-slate-400 font-bold text-sm uppercase">Select one of three options</p>
+    <!-- Footer Commands -->
+    <footer id="footer-ui-container" class="flex-shrink-0">
+        <div id="command-wrapper">
+            <div id="game-message-container">
+                <p id="game-message"
+                    class="text-white font-black text-xl font-orbitron italic tracking-widest uppercase"></p>
             </div>
-            <div id="treasure-cards-container" class="flex flex-col gap-4 w-full max-w-2xl justify-center items-center">
-                <!-- Cards will be inserted here by JavaScript -->
-            </div>
-        </div>
 
-        <script type="module" src="js/main.js"></script>
+            <!-- Ready Button (Restored) -->
+            <div class="w-full flex justify-center mb-2">
+                <button id="btn-ready" onclick="confirmCommand()" disabled
+                    class="ready-btn w-64 py-3 bg-white text-slate-950 rounded-xl font-black text-xl uppercase shadow-[0_0_20px_rgba(255,255,255,0.4)] transition-all active:scale-95 disabled:opacity-0 disabled:pointer-events-none font-orbitron tracking-widest hover:bg-slate-200">
+                    Ready
+                </button>
+            </div>
+
+            <!-- コマンドエリア -->
+            <div class="flex space-x-3 items-end mb-4 pt-4">
+                <button id="cmd-CHARGE" onclick="selectCommand('CHARGE')" class="command-btn btn-charge"><span
+                        class="stat-badge" id="badge-charge-val">0</span><i data-lucide="zap" class="w-8 h-8"></i><span
+                        class="effect-label" id="eff-charge">+1</span></button>
+                <button id="cmd-ATTACK" onclick="selectCommand('ATTACK')" class="command-btn btn-attack"><span
+                        class="stat-badge" id="badge-attack-val">1</span><i data-lucide="sword"
+                        class="w-8 h-8"></i><span class="effect-label" id="eff-attack">1 DMG</span></button>
+                <button id="cmd-GUARD" onclick="selectCommand('GUARD')" class="command-btn btn-guard"><span
+                        class="stat-badge" id="badge-guard-val">0</span><i data-lucide="shield"
+                        class="w-8 h-8"></i><span class="effect-label" id="eff-guard">BLOCK</span></button>
+                <button id="cmd-SKILL" onclick="selectCommand('SKILL')" class="command-btn btn-skill"><span
+                        class="stat-badge" id="badge-skill-val">?</span><i data-lucide="star" class="w-8 h-8"></i><span
+                        class="effect-label" id="eff-skill">SKILL</span></button>
+            </div>
+
+            <div class="mt-2 font-orbitron text-[10px] font-black text-slate-700 tracking-[0.2em]">TURN <span
+                    id="turn-display">1</span></div>
+        </div>
+    </footer>
+
+    <!-- Result -->
+    <div id="result-overlay"
+        class="fixed inset-0 z-[150] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-500">
+        <div
+            class="w-full max-w-xs flex flex-col items-center p-10 bg-slate-900 border-4 border-slate-800 rounded-[3rem] shadow-2xl text-center text-white">
+            <h2 id="result-title" class="text-4xl font-black italic font-orbitron mb-4 uppercase tracking-tighter">
+                Result</h2>
+            <p id="result-desc" class="text-slate-400 mb-8 font-bold text-sm uppercase"></p>
+            <div id="streak-result-box" class="mb-8 hidden">
+                <div class="text-xs font-black text-slate-500 uppercase tracking-widest mb-1 font-orbitron">Win
+                    Streak
+                </div>
+                <div id="final-streak-val" class="text-5xl font-black font-orbitron text-rose-500">0</div>
+            </div>
+            <button id="btn-next-stage" onclick="nextStage()"
+                class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase text-lg active:scale-95 mb-3 hidden uppercase">Next
+                Enemy</button>
+            <button onclick="restartApp()"
+                class="w-full bg-white text-slate-950 py-4 rounded-xl font-black uppercase text-lg active:scale-95 transition-all">タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- Battle Dialog Overlay -->
+    <div id="battle-dialog-overlay"
+        class="fixed inset-0 z-[100] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <!-- Content injected by JS -->
+    </div>
+
+    <!-- Treasure Chest Overlay -->
+    <div id="treasure-overlay"
+        class="fixed inset-0 z-[160] overlay-bg flex-col items-center justify-start hidden opacity-0 transition-opacity duration-500 p-4 pt-12 pb-12 overflow-y-auto">
+        <div class="flex flex-col items-center text-center mb-8">
+            <i data-lucide="gem" class="w-16 h-16 text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.7)] mb-3"></i>
+            <h2 class="text-3xl font-black italic font-orbitron uppercase tracking-tighter text-white">Choose Your
+                Reward</h2>
+            <p class="text-slate-400 font-bold text-sm uppercase">Select one of three options</p>
+        </div>
+        <div id="treasure-cards-container" class="flex flex-col gap-4 w-full max-w-2xl justify-center items-center">
+            <!-- Cards will be inserted here by JavaScript -->
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
 </body>
 
 </html>

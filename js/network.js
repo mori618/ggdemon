@@ -41,9 +41,23 @@ export class NetworkManager {
     }
 
     connect(hostId) {
-        if (!this.peer) return;
-        console.log('Connecting to ' + hostId);
-        const conn = this.peer.connect(hostId);
+        if (!this.peer) {
+            console.error('Cannot connect: peer not initialized');
+            return;
+        }
+        if (!this.peer.open) {
+            console.error('Cannot connect: peer not open yet');
+            return;
+        }
+        console.log('Attempting to connect to: ' + hostId);
+        console.log('My peer state:', this.peer.open ? 'open' : 'not open', 'ID:', this.myId);
+
+        const conn = this.peer.connect(hostId, { reliable: true });
+        if (!conn) {
+            console.error('Failed to create connection object');
+            return;
+        }
+        console.log('Connection object created, waiting for open...');
         this.handleConnection(conn);
     }
 
