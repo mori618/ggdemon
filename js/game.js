@@ -9,7 +9,7 @@ export function setupBattleState() {
     gameState.player.effects = [];
     gameState.player.tempAtk = gameState.player.tempGrdC = gameState.player.tempChgE = gameState.player.tempChgC = gameState.player.tempDmgReduce = 0;
 
-    const isBoss = (gameState.gameMode === 'tower' || true); // TEMPORARY TESTING: Force boss encounter
+    const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 5 === 0);
     let baseCpu;
 
     if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {

@@ -6,32 +6,65 @@ export function renderChars(handleCharSelect) {
     const grid = document.getElementById('char-grid');
     grid.innerHTML = '';
 
+    // コンテナのクラスを横長・多カラム向けに設定（スクロール維持）
+    grid.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 overflow-y-auto pb-10 flex-1";
+
+    // --- RANDOM CARD ---
     const rndDiv = document.createElement('div');
-    rndDiv.className = "bg-slate-900 border-2 border-slate-700 p-4 rounded-3xl cursor-pointer hover:border-sky-500 active:scale-95 transition-all flex flex-col items-center text-center";
+    // 横長にするため flex-row を採用
+    rndDiv.className = "bg-slate-900 border-2 border-slate-700 p-4 rounded-2xl cursor-pointer hover:border-sky-500 hover:bg-slate-800/50 active:scale-[0.98] transition-all flex items-center gap-4 group";
     rndDiv.onclick = () => handleCharSelect('RANDOM');
-    rndDiv.innerHTML = `<div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-2 text-sky-400"><i data-lucide="shuffle" class="w-5 h-5"></i></div><div class="font-black text-[11px] mb-1 uppercase font-orbitron text-white">RANDOM</div><div class="text-[8px] text-slate-500 font-bold italic leading-tight uppercase">Surprise Me</div>`;
+    rndDiv.innerHTML = `
+        <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-sky-400 group-hover:rotate-12 transition-transform">
+            <i data-lucide="shuffle" class="w-6 h-6"></i>
+        </div>
+        <div class="text-left">
+            <div class="font-black text-sm uppercase font-orbitron text-white">Random Select</div>
+            <div class="text-[10px] text-slate-500 font-bold italic uppercase">Surprise Me</div>
+        </div>
+    `;
     grid.appendChild(rndDiv);
 
+    // --- CHARACTER CARDS ---
     CHARACTERS.forEach(c => {
-        const hpStyle = c.hp >= 5 ? 'status-fill text-rose-500' : 'text-rose-500';
-        const atkStyle = c.atk >= 3 ? 'status-fill text-red-400' : 'text-red-400';
-        const chgStyle = c.chgE >= 2 ? 'status-fill text-yellow-400' : 'text-yellow-400';
-        const startEStyle = c.startE >= 3 ? 'status-fill text-emerald-400' : 'text-emerald-400';
+        const stats = [
+            { icon: 'heart', val: c.hp, style: c.hp >= 5 ? 'text-rose-500 fill-rose-500/20' : 'text-rose-400', label: 'HP' },
+            { icon: 'sword', val: c.atk, style: c.atk >= 3 ? 'text-red-500 fill-red-500/20' : 'text-red-400', label: 'ATK' },
+            { icon: 'zap', val: `+${c.chgE}`, style: c.chgE >= 2 ? 'text-yellow-400 fill-yellow-400/20' : 'text-yellow-400', label: 'CHG' },
+            { icon: 'battery', val: c.startE, style: c.startE >= 3 ? 'text-emerald-400 fill-emerald-400/20' : 'text-emerald-400', label: 'ENG' }
+        ];
+
         const div = document.createElement('div');
-        div.className = "bg-slate-900 border-2 border-slate-800 p-4 rounded-3xl cursor-pointer hover:border-emerald-500 active:scale-95 transition-all flex flex-col items-center text-center text-white";
+        // w-fullで横幅いっぱいに使いつつ、内部をFlexで左右に分ける
+        div.className = "bg-slate-900 border-2 border-slate-800 p-4 rounded-2xl cursor-pointer hover:border-emerald-500 hover:bg-slate-800/40 active:scale-[0.98] transition-all flex flex-col sm:flex-row items-center sm:items-start gap-4 text-white";
         div.onclick = () => handleCharSelect(c.id);
+
         div.innerHTML = `
-            <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-2 text-slate-300"><i data-lucide="${c.icon}" class="text-slate-300 w-5 h-5"></i></div>
-            <div class="font-black text-[11px] mb-1 uppercase font-orbitron">${c.name}</div>
-            <div class="text-[8px] text-slate-500 font-bold mb-3 italic leading-tight uppercase line-clamp-1">"${c.tagline}"</div>
-            <div class="grid grid-cols-4 gap-1 w-full border-t border-slate-800/50 pt-3">
-                <div class="flex flex-col items-center gap-1"><i data-lucide="heart" class="w-3 h-3 ${hpStyle}"></i><span class="text-[9px] font-black font-orbitron">${c.hp}</span></div>
-                <div class="flex flex-col items-center gap-1"><i data-lucide="sword" class="w-3 h-3 ${atkStyle}"></i><span class="text-[9px] font-black font-orbitron">${c.atk}</span></div>
-                <div class="flex flex-col items-center gap-1"><i data-lucide="zap" class="w-3 h-3 ${chgStyle}"></i><span class="text-[9px] font-black font-orbitron">+${c.chgE}</span></div>
-                <div class="flex flex-col items-center gap-1"><i data-lucide="battery" class="w-3 h-3 ${startEStyle}"></i><span class="text-[9px] font-black font-orbitron">${c.startE}</span></div>
-            </div>`;
+            <div class="flex flex-row sm:flex-col items-center gap-3 sm:w-1/3 border-b sm:border-b-0 sm:border-r border-slate-800/50 pb-3 sm:pb-0 sm:pr-4">
+                <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 shadow-inner">
+                    <i data-lucide="${c.icon}" class="w-6 h-6"></i>
+                </div>
+                <div class="text-left sm:text-center">
+                    <div class="font-black text-[10px] uppercase font-orbitron tracking-wider">${c.name}</div>
+                    <!-- <div class="text-[9px] text-slate-500 font-bold italic line-clamp-1 uppercase mt-0.5">"${c.tagline}"</div> -->
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-4 sm:grid-cols-2 gap-2 w-full sm:w-2/3 pt-1">
+                ${stats.map(s => `
+                    <div class="flex flex-col items-center justify-center bg-slate-950/50 rounded-lg py-1.5 border border-slate-800/30">
+                        <div class="flex items-center gap-1 mb-0.5">
+                            <i data-lucide="${s.icon}" class="w-3 h-3 ${s.style}"></i>
+                            <span class="text-[8px] text-slate-500 font-bold uppercase">${s.label}</span>
+                        </div>
+                        <span class="text-[11px] font-black font-orbitron">${s.val}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
         grid.appendChild(div);
     });
+
     lucide.createIcons();
 }
 
