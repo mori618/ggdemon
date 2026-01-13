@@ -1,4 +1,4 @@
-import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER } from './constants.js';
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES } from './constants.js';
 import { gameState, saveHighStreak } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy } from './ui.js';
@@ -12,7 +12,10 @@ export function setupBattleState() {
     const isBoss = (gameState.gameMode === 'tower' || true); // TEMPORARY TESTING: Force boss encounter
     let baseCpu;
 
-    if (gameState.gameMode === 'tower') {
+    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+        // Online: cChar is set via network sync
+        baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
+    } else if (gameState.gameMode === 'tower') {
         if (isBoss) {
             baseCpu = JSON.parse(JSON.stringify(BOSS_CHARACTERS[Math.floor(Math.random() * BOSS_CHARACTERS.length)]));
         } else {
@@ -84,6 +87,11 @@ export function setupBattleState() {
                 badge.classList.add('bg-slate-700');
             }
         }
+        badge.classList.remove('hidden');
+    } else if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+        gameState.playerSkill = null;
+        badge.innerText = "PLAYER 2";
+        badge.classList.add('bg-blue-600');
         badge.classList.remove('hidden');
     } else {
         gameState.playerSkill = null;
