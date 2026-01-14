@@ -60,7 +60,7 @@
 
     <!-- Screen 1: Selection Phase -->
     <div id="select-screen"
-        class="fixed inset-0 z-[100] flex flex-col items-center justify-start p-6 bg-slate-950 hidden text-white">
+        class="fixed inset-0 z-[100] flex flex-col items-center justify-start p-6 bg-slate-950 hidden text-white overflow-hidden">
         <h2 id="select-title"
             class="text-2xl font-black font-orbitron text-center mt-6 mb-8 bg-gradient-to-r from-emerald-400 via-sky-400 to-rose-400 bg-clip-text text-transparent italic tracking-tighter uppercase">
             Select Your Hero</h2>
@@ -194,6 +194,20 @@
             </div>
             <button onclick="exitOnline()"
                 class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+        </div>
+
+        <!-- Diagnostic Logs -->
+        <div class="mt-8 w-full max-w-md">
+            <div class="flex items-center justify-between mb-2 px-2">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest font-orbitron">Network
+                    Logs</span>
+                <button onclick="document.getElementById('online-log').innerHTML = ''"
+                    class="text-[10px] text-blue-500 font-bold uppercase hover:text-blue-400">Clear</button>
+            </div>
+            <div id="online-log"
+                class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 h-32 overflow-y-auto font-mono text-[9px] text-slate-400 space-y-1">
+                <div class="italic text-slate-600">Waiting for activity...</div>
+            </div>
         </div>
     </div>
     <div id="char-status-overlay" onclick="closeStatusOverlay()">
