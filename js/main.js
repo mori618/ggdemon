@@ -1,7 +1,7 @@
 import { CHARACTERS, GAME_MODES, NETWORK_EVENTS } from './constants.js';
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak } from './utils.js';
-import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage, addLog } from './ui.js';
+import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
 import { setupBattleState, getCpuMove, executeTurn } from './game.js';
 import { network } from './network.js';
 
@@ -10,9 +10,6 @@ window.onload = () => {
     renderChars(handleCharSelect);
     loadHighStreak();
     syncAudioUI();
-
-    // Setup network logger
-    network.setOnLog((msg) => addLog(msg));
 };
 
 // Online UI Handlers
