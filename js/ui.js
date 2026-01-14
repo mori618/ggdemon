@@ -110,6 +110,24 @@ export function setMessage(m) {
     document.getElementById('game-message').innerText = m;
 }
 
+export function addLog(msg) {
+    const logEl = document.getElementById('online-log');
+    if (!logEl) return;
+    const div = document.createElement('div');
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+    // Auto-scroll if at bottom
+    const isAtBottom = logEl.scrollHeight - logEl.clientHeight <= logEl.scrollTop + 1;
+
+    div.innerHTML = `<span class="text-slate-600 font-bold">[${time}]</span> ${msg}`;
+    logEl.appendChild(div);
+
+    if (isAtBottom) {
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+}
+
 export function updateUI() {
     const { player, cpu, pHP, cHP, pEnergy, cEnergy, turn, isProc, selectedCmd, playerSkill } = gameState;
     if (!player) return;

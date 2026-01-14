@@ -7,10 +7,18 @@ export class NetworkManager {
         this.onDataCallback = null;
         this.onConnectCallback = null;
         this.onDisconnectCallback = null;
+        this.onLogCallback = null;
+    }
+
+    log(msg) {
+        console.log(`[NetworkManager] ${msg}`);
+        if (this.onLogCallback) this.onLogCallback(msg);
     }
 
     init(isHost, onIdGenerated) {
         this.isHost = isHost;
+        this.log(`Initializing as ${isHost ? 'HOST' : 'CLIENT'}...`);
+
         // Generate a simple, readable ID if host, otherwise let PeerJS gen one (we don't use it directly)
         // Note: PeerJS ID must be unique. We will use a random 6-char string for simplicity.
         const id = isHost ? this.generateRandomId() : undefined;
@@ -20,14 +28,16 @@ export class NetworkManager {
         });
 
         this.peer.on('open', (id) => {
-            console.log('My peer ID is: ' + id);
+            this.log('PeerJS server connection opened. My ID: ' + id);
             this.myId = id;
             if (onIdGenerated) onIdGenerated(id);
         });
 
         this.peer.on('connection', (conn) => {
+            this.log(`Incoming connection from: ${conn.peer}`);
             // Only host accepts connections
             if (!this.isHost) {
+                this.log('Closing: only HOST can accept connections');
                 conn.close();
                 return;
             }
@@ -35,59 +45,66 @@ export class NetworkManager {
         });
 
         this.peer.on('error', (err) => {
-            console.error('PeerJS Error:', err);
-            // Optionally notify UI
+            this.log(`<span class="text-rose-400">Error: ${err.type} - ${err.message}</span>`);
+        });
+
+        this.peer.on('disconnected', () => {
+            this.log('Disconnected from PeerJS signaling server');
+        });
+
+        this.peer.on('close', () => {
+            this.log('Peer destroyed');
         });
     }
 
     connect(hostId) {
         if (!this.peer) {
-            console.error('Cannot connect: peer not initialized');
+            this.log('Error: peer not initialized');
             return;
         }
         if (!this.peer.open) {
-            console.error('Cannot connect: peer not open yet');
+            this.log('Error: peer not ready (signaling server connection not open)');
             return;
         }
-        console.log('Attempting to connect to: ' + hostId);
-        console.log('My peer state:', this.peer.open ? 'open' : 'not open', 'ID:', this.myId);
+        this.log(`Attempting connection to HOST: ${hostId}...`);
 
         const conn = this.peer.connect(hostId, { reliable: true });
         if (!conn) {
-            console.error('Failed to create connection object');
+            this.log('Error: failed to create connection object');
             return;
         }
-        console.log('Connection object created, waiting for open...');
         this.handleConnection(conn);
     }
 
     handleConnection(conn) {
         if (this.conn) {
-            console.warn('Already connected, closing new connection');
+            this.log('Already have a connection, ignoring new one');
             conn.close();
             return;
         }
 
         this.conn = conn;
+        this.log(`Waiting for connection to open with ${conn.peer}...`);
 
         this.conn.on('open', () => {
-            console.log('Connected to: ' + this.conn.peer);
+            this.log(`<span class="text-emerald-400 font-bold">Successfully connected to: ${this.conn.peer}</span>`);
             if (this.onConnectCallback) this.onConnectCallback(this.conn.peer);
         });
 
         this.conn.on('data', (data) => {
-            console.log('Received:', data);
+            // Log data receipt silently in UI log unless critical, otherwise it floods
+            // this.log(`Data received: ${data.type}`);
             if (this.onDataCallback) this.onDataCallback(data);
         });
 
         this.conn.on('close', () => {
-            console.log('Connection closed');
+            this.log('Connection closed by remote peer');
             this.conn = null;
             if (this.onDisconnectCallback) this.onDisconnectCallback();
         });
 
         this.conn.on('error', (err) => {
-            console.error('Connection error:', err);
+            this.log(`<span class="text-rose-400">Data Connection Error: ${err}</span>`);
         });
     }
 
@@ -95,7 +112,7 @@ export class NetworkManager {
         if (this.conn && this.conn.open) {
             this.conn.send({ type, payload });
         } else {
-            console.warn('Cannot send, connection not open');
+            this.log('Error: cannot send (connection not open)');
         }
     }
 
@@ -112,6 +129,7 @@ export class NetworkManager {
     setOnData(cb) { this.onDataCallback = cb; }
     setOnConnect(cb) { this.onConnectCallback = cb; }
     setOnDisconnect(cb) { this.onDisconnectCallback = cb; }
+    setOnLog(cb) { this.onLogCallback = cb; }
 }
 
 export const network = new NetworkManager();
