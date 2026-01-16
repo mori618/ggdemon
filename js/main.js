@@ -98,13 +98,39 @@ window.changeVolume = (val) => {
 
 window.showTutorial = () => {
     sound.playSE('click');
-    document.getElementById('tutorial-screen').classList.add('active-overlay');
+    document.getElementById('tutorial-screen').classList.remove('hidden');
+    setTimeout(() => document.getElementById('tutorial-screen').classList.remove('opacity-0'), 10);
+    switchManualTab('basic');
     lucide.createIcons();
 };
 
 window.hideTutorial = () => {
     sound.playSE('click');
-    document.getElementById('tutorial-screen').classList.remove('active-overlay');
+    const el = document.getElementById('tutorial-screen');
+    el.classList.add('opacity-0');
+    setTimeout(() => el.classList.add('hidden'), 300);
+};
+
+window.switchManualTab = (tabId) => {
+    sound.playSE('click');
+
+    // Update Tabs
+    ['basic', 'commands', 'strategy', 'tower'].forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const content = document.getElementById(`tab-content-${t}`);
+
+        if (t === tabId) {
+            // Active Style
+            btn.className = "tab-btn flex items-center gap-2 px-4 py-3 font-bold transition-all border-emerald-400 text-emerald-400 bg-emerald-400/5 shrink-0 border-b-2";
+            content.classList.remove('hidden');
+            // Re-render icons for the newly visible content
+            requestAnimationFrame(() => lucide.createIcons());
+        } else {
+            // Inactive Style
+            btn.className = "tab-btn flex items-center gap-2 px-4 py-3 font-bold transition-all border-transparent text-slate-400 hover:text-slate-200 shrink-0 border-b-2";
+            content.classList.add('hidden');
+        }
+    });
 };
 
 window.goToSelection = (mode) => {
