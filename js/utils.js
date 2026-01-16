@@ -22,6 +22,7 @@ export const gameState = {
     playerSkill: null,
     playerHistory: [],
     treasureFloorOffset: 0, // Offset within a 5-floor cycle (0-4, but Floor 5/10 are bosses)
+    lives: 0,
 };
 
 export const MAX_HISTORY = 5;

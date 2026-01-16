@@ -108,7 +108,11 @@ export function setupBattleState() {
 
     document.getElementById('player-name-label').innerText = gameState.player.name;
     document.getElementById('cpu-name-label').innerText = gameState.cpu.name;
-    document.getElementById('player-icon-container').innerHTML = `<i data-lucide="${gameState.player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+    let playerIconHtml = `<i data-lucide="${gameState.player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+    if (gameState.gameMode === 'tower') {
+        playerIconHtml += `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
+    }
+    document.getElementById('player-icon-container').innerHTML = playerIconHtml;
     document.getElementById('cpu-icon-container').innerHTML = `<i data-lucide="${gameState.cpu.icon}" class="w-16 h-16 md:w-20 md:h-20 ${isBoss ? 'text-purple-500' : 'text-rose-500/50'}"></i>`;
 
     initEnergy();
@@ -232,7 +236,30 @@ export function executeTurn(pM, cM) {
 
         setTimeout(() => {
             pC.classList.remove('shake'); cC.classList.remove('shake');
+
+            // Revival Logic for Tower Mode
+            if (gameState.pHP <= 0 && gameState.gameMode === 'tower' && gameState.lives > 0) {
+                gameState.lives--;
+                gameState.pHP = gameState.player.hp; // Recover to Max
+                gameState.player.hp = gameState.pHP;
+                sound.playSE('charge'); // Revival sound
+
+                // Visual feedback
+                setMessage(`REVIVED! (LIVES: ${gameState.lives})`);
+                pC.classList.add('animate-pulse'); // Visual effect
+                setTimeout(() => pC.classList.remove('animate-pulse'), 1000);
+
+                // Update specific UI elements immediately
+                const playerIconHtml = `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
+                const iconContainer = document.getElementById('player-icon-container');
+                if (iconContainer.querySelector('.absolute')) {
+                    iconContainer.querySelector('.absolute').innerText = gameState.lives;
+                }
+                updateUI();
+            }
+
             const cWinF = (gameState.cEnergy >= gameState.cpu.winE);
+            // Check Game Over (pHP is now checked after potential revival)
             if (gameState.pHP <= 0 || gameState.cHP <= 0 || gameState.pEnergy >= gameState.player.winE || cWinF) {
                 // 戦闘終了時にダイアログを確実に非表示
                 dialogOverlay.classList.add('opacity-0');
@@ -248,7 +275,9 @@ export function executeTurn(pM, cM) {
                 document.getElementById('command-wrapper').classList.remove('ui-hidden');
 
                 updateUI();
-                setMessage("Command Select");
+                if (gameState.turn > 1 && !document.getElementById('game-message').innerText.includes('REVIVED')) {
+                    setMessage("Command Select");
+                }
             }
         }, 500);
     }, 800);
@@ -277,10 +306,12 @@ function showFinal(cpuEWin) {
     } else if (gameState.gameMode === 'tower') {
         streakB.classList.remove('hidden');
         document.getElementById('final-streak-val').innerText = gameState.floor;
+
         if (gameState.floor > gameState.highStreak) {
             gameState.highStreak = gameState.floor;
             saveHighStreak(gameState.highStreak);
         }
+
         ov.classList.remove('hidden'); setTimeout(() => ov.classList.add('opacity-100'), 10);
     } else {
         ov.classList.remove('hidden'); setTimeout(() => ov.classList.add('opacity-100'), 10);

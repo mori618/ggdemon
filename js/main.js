@@ -330,6 +330,7 @@ network.setOnData((data) => {
 
 function startTower() {
     gameState.floor = 0;
+    gameState.lives = 3;
     gameState.winStreak = 0;
     gameState.winsSinceChest = 0;
     gameState.playerSkill = null;
