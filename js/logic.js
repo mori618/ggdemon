@@ -1,3 +1,5 @@
+import { CHARACTERS, BOSS_CHARACTERS, TREASURE_MONSTER, ENEMY_TRAITS, PASSIVE_SKILLS } from './constants.js';
+
 /**
  * Battle Charge core game logic.
  * Decoupled from DOM and UI for testability.
@@ -243,3 +245,99 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
 
     return selectedMove;
 }
+
+export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
+    let baseCpu;
+    let aiLevel = 'EASY';
+    const isBoss = (floor > 0 && floor % 5 === 0);
+
+    if (floor === 0) {
+        baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+        aiLevel = 'EASY';
+        return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: false };
+    }
+
+    if (isBoss) {
+        // Draw from Boss Deck
+        const bossId = bossDeck.draw();
+        baseCpu = BOSS_CHARACTERS.find(c => c.id === bossId) || BOSS_CHARACTERS[0];
+        baseCpu = JSON.parse(JSON.stringify(baseCpu));
+
+        aiLevel = 'NORMAL';
+        baseCpu.hp += Math.floor(floor / 4);
+        baseCpu.atk += Math.floor(floor / 10);
+
+        return { cpu: baseCpu, aiLevel, isBoss: true, isTreasure: false };
+    }
+
+    if (isTreasureFloor) {
+        baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+        aiLevel = 'EASY';
+        return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: true };
+    }
+
+    // Normal Enemy
+    const mobId = mobDeck.draw();
+    baseCpu = CHARACTERS.find(c => c.id === mobId) || CHARACTERS[0];
+    baseCpu = JSON.parse(JSON.stringify(baseCpu));
+
+    // Scaling
+    let traitCount = 0;
+
+    if (floor <= 4) { traitCount = 0; aiLevel = 'EASY'; }
+    else if (floor <= 9) { traitCount = 1; aiLevel = 'NORMAL'; }
+    else if (floor <= 14) { traitCount = 1; aiLevel = 'NORMAL'; }
+    else if (floor <= 19) { traitCount = Math.floor(Math.random() * 2) + 1; aiLevel = 'HARD'; }
+    else if (floor <= 24) { traitCount = 2; aiLevel = 'HARD'; }
+    else { traitCount = Math.floor(Math.random() * 2) + 2; aiLevel = 'EXPERT'; }
+
+    // Apply Traits
+    for (let i = 0; i < traitCount; i++) {
+        const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
+        baseCpu.name = trait.name + baseCpu.name;
+        baseCpu.hp = Math.max(1, baseCpu.hp + (trait.hp || 0));
+        baseCpu.atk = Math.max(1, baseCpu.atk + (trait.atk || 0));
+        baseCpu.chgE = Math.max(1, baseCpu.chgE + (trait.chgE || 0));
+        baseCpu.winE = Math.max(3, baseCpu.winE + (trait.winE || 0));
+        baseCpu.grdC = Math.max(0, baseCpu.grdC + (trait.grdC || 0));
+        baseCpu.atkC = Math.max(0, baseCpu.atkC + (trait.atkC || 0));
+        baseCpu.startE = Math.max(0, baseCpu.startE + (trait.startE || 0));
+        if (i === 0) baseCpu.tagline = trait.tagline;
+    }
+
+    // Floor HP Scaling
+    const floorBoost = Math.floor(floor / 5);
+    baseCpu.hp += floorBoost;
+    if (floor <= 2) baseCpu.hp = 1;
+
+    // Passives
+    let passiveType = 'NONE';
+    if (floor >= 6 && floor <= 9) passiveType = 'SELF';
+    else if (floor >= 11 && floor <= 14) passiveType = 'DEBUFF';
+    else if (floor >= 16) passiveType = 'ANY';
+
+    if (passiveType !== 'NONE') {
+        const selfBuffIds = ['FIRST_STRIKE', 'IRON_CLAD', 'WAR_CRY', 'FOCUS', 'VITALITY'];
+        const debuffIds = ['LIFE_CUT', 'SLUGGISH', 'LONG_ROAD', 'SILENCE', 'HEAVY_WEIGHT', 'LEAK'];
+
+        let pool = [];
+        if (passiveType === 'SELF') pool = PASSIVE_SKILLS.filter(p => selfBuffIds.includes(p.id));
+        else if (passiveType === 'DEBUFF') pool = PASSIVE_SKILLS.filter(p => debuffIds.includes(p.id));
+        else pool = PASSIVE_SKILLS;
+
+        if (pool.length > 0) {
+            const passive = pool[Math.floor(Math.random() * pool.length)];
+            // Note: In logic we can't 'apply' easily if it mutates 'gameState.player' directly.
+            // But 'apply' function takes (cpu, player).
+            // Here we are generating 'cpu'. 'apply' usually happens at Start of Battle.
+            // We should attach the passive definition to the CPU object, and let the game engine execute it later.
+            // Or execute it here IF we have the player object? 
+            // Better: Just attach the passive object, and let setupBattleState call .apply().
+            baseCpu.passive = passive;
+            baseCpu.tagline += ` [${passive.name}]`;
+        }
+    }
+
+    return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: false };
+}
+

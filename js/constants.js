@@ -19,11 +19,11 @@ export const ENEMY_TRAITS = [
 ];
 
 export const BOSS_CHARACTERS = [
-    { id: 'VOID_EATER', name: 'Void Eater', hp: 15, atk: 2, winE: 20, chgE: 4, grdC: 0, atkC: 2, chgC: 1, startE: 5, icon: 'ghost', tagline: '全てを無に帰すタワーの支配者' },
-    { id: 'CORE_TITAN', name: 'Core Titan', hp: 25, atk: 4, winE: 15, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 0, icon: 'database', tagline: '一撃必殺のチャージを蓄える巨像' },
-    { id: 'FALLEN_KING', name: 'Fallen King', hp: 20, atk: 3, winE: 18, chgE: 2, grdC: 1, atkC: 2, chgC: 0, startE: 2, icon: 'crown', tagline: 'かつて栄華を極めた堕落の王' },
-    { id: 'STORM_BRINGER', name: 'Storm Bringer', hp: 12, atk: 2, winE: 10, chgE: 5, grdC: 0, atkC: 1, chgC: 0, startE: 4, icon: 'cloud-lightning', tagline: '嵐を呼ぶ天空の覇者' },
-    { id: 'ABYSS_WATCHER', name: 'Abyss Watcher', hp: 30, atk: 2, winE: 12, chgE: 1, grdC: 0, atkC: 2, chgC: 0, startE: 0, icon: 'eye', tagline: '深淵を覗き込む異形の存在' }
+    { id: 'VOID_EATER', name: 'Void Eater', hp: 6, atk: 2, winE: 20, chgE: 4, grdC: 0, atkC: 2, chgC: 1, startE: 5, icon: 'ghost', tagline: '全てを無に帰すタワーの支配者' },
+    { id: 'CORE_TITAN', name: 'Core Titan', hp: 10, atk: 4, winE: 15, chgE: 1, grdC: 1, atkC: 3, chgC: 0, startE: 0, icon: 'database', tagline: '一撃必殺のチャージを蓄える巨像' },
+    { id: 'FALLEN_KING', name: 'Fallen King', hp: 8, atk: 3, winE: 18, chgE: 2, grdC: 1, atkC: 2, chgC: 0, startE: 2, icon: 'crown', tagline: 'かつて栄華を極めた堕落の王' },
+    { id: 'STORM_BRINGER', name: 'Storm Bringer', hp: 5, atk: 2, winE: 10, chgE: 5, grdC: 0, atkC: 1, chgC: 0, startE: 4, icon: 'cloud-lightning', tagline: '嵐を呼ぶ天空の覇者' },
+    { id: 'ABYSS_WATCHER', name: 'Abyss Watcher', hp: 12, atk: 2, winE: 12, chgE: 1, grdC: 0, atkC: 2, chgC: 0, startE: 0, icon: 'eye', tagline: '深淵を覗き込む異形の存在' }
 ];
 
 export const TREASURE_MONSTER = { id: 'TREASURE_CHEST', name: 'Treasure', hp: 1, atk: 7, winE: 10, chgE: 1, grdC: 10, atkC: 7, chgC: 0, startE: 0, icon: 'gift', tagline: '中にはお宝が詰まっているようだ' };
