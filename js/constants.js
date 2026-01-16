@@ -83,7 +83,8 @@ export const EFFECT_ICONS = {
     'ATK_DOWN': { icon: 'sword', color: 'text-slate-500' },
     'DMG_REDUCE': { icon: 'shield-check', color: 'text-emerald-400' },
     'POISON': { icon: 'biohazard', color: 'text-lime-400' },
-    'DOOM': { icon: 'skull', color: 'text-purple-600' }
+    'DOOM': { icon: 'skull', color: 'text-purple-600' },
+    'SKILL_SEAL': { icon: 'lock', color: 'text-slate-400' }
 };
 
 export const GAME_MODES = {
@@ -102,3 +103,18 @@ export const NETWORK_EVENTS = {
     SYNC_STATE: 'SYNC_STATE',
     CHAT: 'CHAT'
 };
+
+export const PASSIVE_SKILLS = [
+    { id: 'FIRST_STRIKE', name: '機先', apply: (cpu, player) => { cpu.startE += 2; }, description: '開幕エネルギー+2' },
+    { id: 'IRON_CLAD', name: '堅牢', apply: (cpu, player) => { cpu.effects.push({ type: 'DMG_REDUCE', amount: 1, turns: 3 }); }, description: '開幕3ターン軽減(1)' },
+    { id: 'WAR_CRY', name: '雄叫び', apply: (cpu, player) => { cpu.effects.push({ type: 'ATK_UP', amount: 1, turns: 3 }); }, description: '開幕3ターンATK+1' },
+    { id: 'FOCUS', name: '集中', apply: (cpu, player) => { cpu.effects.push({ type: 'CHGE_UP', amount: 1, turns: 3 }); }, description: '開幕3ターンChgE+1' },
+    { id: 'VITALITY', name: '活力', apply: (cpu, player) => { cpu.hp += 5; }, description: '最大HP+5' },
+    // Debuff Skills
+    { id: 'LIFE_CUT', name: '命削り', apply: (cpu, player) => { player.hp = Math.floor(player.hp * 0.7); }, description: 'プレイヤーHP3割減' },
+    { id: 'SLUGGISH', name: '停滞', apply: (cpu, player) => { player.chgE = Math.floor(player.chgE * 0.7); }, description: 'プレイヤーChgE3割減' },
+    { id: 'LONG_ROAD', name: '長き道', apply: (cpu, player) => { player.winE = Math.floor(player.winE * 1.5); }, description: 'プレイヤーWinE1.5倍' },
+    { id: 'SILENCE', name: '沈黙', apply: (cpu, player) => { player.effects.push({ type: 'SKILL_SEAL', amount: 0, turns: 3 }); }, description: '3ターンスキル不可' },
+    { id: 'HEAVY_WEIGHT', name: '重枷', apply: (cpu, player) => { player.atkC += 1; }, description: 'プレイヤー攻撃コスト+1' },
+    { id: 'LEAK', name: '漏出', apply: (cpu, player) => { player.startE = Math.floor(player.startE * 0.5); }, description: 'プレイヤー初期エナジー半減' }
+];

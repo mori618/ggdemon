@@ -1,6 +1,6 @@
 import { CHARACTERS, GAME_MODES, NETWORK_EVENTS } from './constants.js';
 import { sound } from './sounds.js';
-import { gameState, loadHighStreak } from './utils.js';
+import { gameState, loadHighStreak, Deck } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
 import { setupBattleState, getCpuMove, executeTurn } from './game.js';
 import { network } from './network.js';
@@ -334,11 +334,17 @@ function startTower() {
     gameState.winsSinceChest = 0;
     gameState.playerSkill = null;
     gameState.aiLevel = 'NORMAL';
+
+    // Initialize Decks
+    gameState.mobDeck = new Deck(CHARACTERS.map(c => c.id));
+    gameState.bossDeck = new Deck(BOSS_CHARACTERS.map(c => c.id));
+
     gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
     document.getElementById('select-screen').classList.add('hidden');
     document.getElementById('tower-indicator').classList.remove('hidden');
     setupBattleState();
 }
+
 
 function startGame() {
     sound.playSE('ready');

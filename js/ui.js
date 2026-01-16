@@ -177,6 +177,9 @@ export function updateUI() {
     const isGuardDisabled = pEnergy < pGrdC || isProc;
     let isSkillDisabled = true;
 
+    // Check for Skill Seal
+    const isSilenced = player.effects.some(e => e.type === 'SKILL_SEAL');
+
     document.getElementById('cmd-CHARGE').classList.toggle('is-disabled', isChargeDisabled);
     document.getElementById('cmd-ATTACK').classList.toggle('is-disabled', isAttackDisabled);
     document.getElementById('cmd-GUARD').classList.toggle('is-disabled', isGuardDisabled);
@@ -187,7 +190,7 @@ export function updateUI() {
     const skillBtn = document.getElementById('cmd-SKILL');
     if (playerSkill) {
         const pSkillCost = Math.max(0, playerSkill.cost + (gameState.pChar.skillCostBonus || 0));
-        isSkillDisabled = pEnergy < pSkillCost || isProc;
+        isSkillDisabled = pEnergy < pSkillCost || isProc || isSilenced;
         document.getElementById('badge-skill-val').innerText = String(pSkillCost);
         document.getElementById('eff-skill').innerText = playerSkill.name;
         checkC('badge-skill-val', pSkillCost);

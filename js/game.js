@@ -1,4 +1,4 @@
-import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES } from './constants.js';
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS } from './constants.js';
 import { gameState, saveHighStreak } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy } from './ui.js';
@@ -17,9 +17,15 @@ export function setupBattleState() {
         baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
     } else if (gameState.gameMode === 'tower') {
         if (isBoss) {
-            baseCpu = JSON.parse(JSON.stringify(BOSS_CHARACTERS[Math.floor(Math.random() * BOSS_CHARACTERS.length)]));
+            // Draw from Boss Deck
+            const bossId = gameState.bossDeck.draw();
+            baseCpu = BOSS_CHARACTERS.find(c => c.id === bossId);
+            baseCpu = JSON.parse(JSON.stringify(baseCpu));
         } else {
-            baseCpu = JSON.parse(JSON.stringify(CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]));
+            // Draw from Mob Deck
+            const mobId = gameState.mobDeck.draw();
+            baseCpu = CHARACTERS.find(c => c.id === mobId);
+            baseCpu = JSON.parse(JSON.stringify(baseCpu));
         }
     } else {
         baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
@@ -33,7 +39,7 @@ export function setupBattleState() {
     document.getElementById('tower-indicator').classList.toggle('hidden', gameState.gameMode !== 'tower');
 
     const badge = document.getElementById('cpu-level-badge');
-    badge.classList.remove('bg-purple-600', 'animate-pulse', 'bg-slate-700', 'bg-rose-600');
+    badge.classList.remove('bg-purple-600', 'animate-pulse', 'bg-slate-700', 'bg-rose-600', 'bg-amber-600', 'bg-blue-600');
 
     if (gameState.gameMode === 'tower') {
         document.getElementById('current-floor-val').innerText = gameState.floor;
@@ -57,7 +63,8 @@ export function setupBattleState() {
             const cyclePos = (gameState.floor - 1) % 5; // 0, 1, 2, 3
             if (cyclePos === 0) {
                 // Determine treasure floor for this cycle (0-3)
-                gameState.treasureFloorOffset = Math.floor(Math.random() * 4);
+                // Note: This logic should ideally be run at the start of the cycle, keeping it here for safety
+                // Ideally initialized in main.js or after boss defeat
             }
 
             if (cyclePos === gameState.treasureFloorOffset) {
@@ -68,21 +75,76 @@ export function setupBattleState() {
                 badge.innerText = `TREASURE`;
                 badge.classList.add('bg-amber-600');
             } else {
-                gameState.aiLevel = (gameState.floor <= 2) ? 'EASY' : 'NORMAL';
-                const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
-                gameState.cpu.name = trait.name + gameState.cpu.name;
-                gameState.cpu.hp = Math.max(1, gameState.cpu.hp + (trait.hp || 0));
-                gameState.cpu.atk = Math.max(1, gameState.cpu.atk + (trait.atk || 0));
-                gameState.cpu.chgE = Math.max(1, gameState.cpu.chgE + (trait.chgE || 0));
-                gameState.cpu.winE = Math.max(3, gameState.cpu.winE + (trait.winE || 0));
-                gameState.cpu.grdC = Math.max(0, gameState.cpu.grdC + (trait.grdC || 0));
-                gameState.cpu.atkC = Math.max(0, gameState.cpu.atkC + (trait.atkC || 0));
-                gameState.cpu.startE = Math.max(0, gameState.cpu.startE + (trait.startE || 0));
-                gameState.cpu.tagline = trait.tagline;
+                // Difficulty Scaling Logic
+                let traitCount = 0;
+                let aiLevel = 'EASY';
+                const f = gameState.floor;
+
+                if (f <= 4) { traitCount = 0; aiLevel = 'EASY'; }
+                else if (f <= 9) { traitCount = 1; aiLevel = 'NORMAL'; }
+                else if (f <= 14) { traitCount = 1; aiLevel = 'NORMAL'; }
+                else if (f <= 19) { traitCount = Math.floor(Math.random() * 2) + 1; aiLevel = 'HARD'; } // 1-2 traits
+                else if (f <= 24) { traitCount = 2; aiLevel = 'HARD'; }
+                else { traitCount = Math.floor(Math.random() * 2) + 2; aiLevel = 'EXPERT'; } // 2-3 traits
+
+                gameState.aiLevel = aiLevel;
+
+                // Apply Traits
+                for (let i = 0; i < traitCount; i++) {
+                    const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
+                    gameState.cpu.name = trait.name + gameState.cpu.name;
+                    gameState.cpu.hp = Math.max(1, gameState.cpu.hp + (trait.hp || 0));
+                    gameState.cpu.atk = Math.max(1, gameState.cpu.atk + (trait.atk || 0));
+                    gameState.cpu.chgE = Math.max(1, gameState.cpu.chgE + (trait.chgE || 0));
+                    gameState.cpu.winE = Math.max(3, gameState.cpu.winE + (trait.winE || 0));
+                    gameState.cpu.grdC = Math.max(0, gameState.cpu.grdC + (trait.grdC || 0));
+                    gameState.cpu.atkC = Math.max(0, gameState.cpu.atkC + (trait.atkC || 0));
+                    gameState.cpu.startE = Math.max(0, gameState.cpu.startE + (trait.startE || 0));
+                    if (i === 0) gameState.cpu.tagline = trait.tagline; // Only show first trait tagline
+                }
 
                 const floorBoost = Math.floor(gameState.floor / 5);
                 gameState.cpu.hp += floorBoost;
                 if (gameState.floor <= 2) gameState.cpu.hp = 1;
+
+                // Apply Passive Skill
+                if (f >= 6) { // Passives start from floor 6 based on request logic, but chart says 6-9F 1 trait
+                    // Wait, the request says:
+                    // 1-4F: 0 traits, 0 passives
+                    // 6-9F: 1 trait, 1 self-buff passive
+                    // 11-14F: 1 trait, 1 debuff passive
+                    // 16-19F: 1-2 traits, 1 passive (any)
+                    // ...
+
+                    let passiveType = 'NONE';
+                    if (f >= 6 && f <= 9) passiveType = 'SELF';
+                    else if (f >= 11 && f <= 14) passiveType = 'DEBUFF';
+                    else if (f >= 16) passiveType = 'ANY';
+
+                    if (passiveType !== 'NONE') {
+                        // Filter PASSIVE_SKILLS
+                        // We need to categorize passives in constants.js or filter by ID/Description
+                        // Current implementation of constants has debuffs at the end
+                        // Let's rely on indices or add a type property in a future refactor.
+                        // For now, I'll filter by ID list logic or manual split.
+
+                        const selfBuffIds = ['FIRST_STRIKE', 'IRON_CLAD', 'WAR_CRY', 'FOCUS', 'VITALITY'];
+                        const debuffIds = ['LIFE_CUT', 'SLUGGISH', 'LONG_ROAD', 'SILENCE', 'HEAVY_WEIGHT', 'LEAK'];
+
+                        let pool = [];
+                        if (passiveType === 'SELF') pool = PASSIVE_SKILLS.filter(p => selfBuffIds.includes(p.id));
+                        else if (passiveType === 'DEBUFF') pool = PASSIVE_SKILLS.filter(p => debuffIds.includes(p.id));
+                        else pool = PASSIVE_SKILLS;
+
+                        if (pool.length > 0) {
+                            const passive = pool[Math.floor(Math.random() * pool.length)];
+                            passive.apply(gameState.cpu, gameState.player);
+                            gameState.cpu.passive = passive;
+                            gameState.cpu.tagline += ` [${passive.name}]`;
+                        }
+                    }
+                }
+
                 badge.innerText = `FLOOR ${gameState.floor}`;
                 badge.classList.add('bg-slate-700');
             }
