@@ -199,20 +199,59 @@ export function updateUI() {
         document.getElementById('badge-skill-val').innerText = '-';
         document.getElementById('eff-skill').innerText = 'NO SKILL';
     }
-    skillBtn.classList.toggle('is-disabled', isSkillDisabled);
+
+    const isBound = player.effects.some(e => e.type === 'BIND');
+    let lastMove = null;
+    if (gameState.playerHistory.length > 0) {
+        lastMove = gameState.playerHistory[gameState.playerHistory.length - 1];
+    }
+
+    // 各アクションの実行可否を判定
+    const canDoCharge = !isChargeDisabled && !(isBound && lastMove === 'CHARGE');
+    const canDoAttack = !isAttackDisabled && !(isBound && lastMove === 'ATTACK');
+    const canDoGuard = !isGuardDisabled && !(isBound && lastMove === 'GUARD');
+    const canDoSkill = !isSkillDisabled && !(isBound && lastMove === 'SKILL');
+
+    // ソフトロック判定: 全ての行動が不可能な場合
+    let forceEnable = null;
+    if (!canDoCharge && !canDoAttack && !canDoGuard && !canDoSkill && !isProc) {
+        // ソフトロック回避: 直前の行動以外を強制許可（コスト無視）
+        // CHARGEが可能(直前でない)ならCHARGE、そうでなければGUARD
+        if (lastMove !== 'CHARGE') forceEnable = 'CHARGE';
+        else forceEnable = 'GUARD';
+    }
+
+    skillBtn.classList.toggle('is-disabled', !canDoSkill && forceEnable !== 'SKILL');
 
     let canConfirm = false;
     if (selectedCmd && !isProc) {
-        switch (selectedCmd) {
-            case 'CHARGE': canConfirm = !isChargeDisabled; break;
-            case 'ATTACK': canConfirm = !isAttackDisabled; break;
-            case 'GUARD': canConfirm = !isGuardDisabled; break;
-            case 'SKILL': canConfirm = !isSkillDisabled; break;
+        // 強制有効化されたコマンドなら許可
+        if (selectedCmd === forceEnable) {
+            canConfirm = true;
+        } else {
+            switch (selectedCmd) {
+                case 'CHARGE': canConfirm = canDoCharge; break;
+                case 'ATTACK': canConfirm = canDoAttack; break;
+                case 'GUARD': canConfirm = canDoGuard; break;
+                case 'SKILL': canConfirm = canDoSkill; break;
+            }
         }
     }
+
     document.getElementById('btn-ready').disabled = !canConfirm;
     ['CHARGE', 'ATTACK', 'GUARD', 'SKILL'].forEach(c => {
         const b = document.getElementById(`cmd-${c}`);
+
+        let isDisabled = false;
+        if (c === 'CHARGE') isDisabled = !canDoCharge;
+        if (c === 'ATTACK') isDisabled = !canDoAttack;
+        if (c === 'GUARD') isDisabled = !canDoGuard;
+        if (c === 'SKILL') isDisabled = !canDoSkill;
+
+        // Force EnableならDisabled解除
+        if (c === forceEnable) isDisabled = false;
+
+        b.classList.toggle('is-disabled', isDisabled);
         if (selectedCmd === c) b.classList.add('selected');
         else b.classList.remove('selected');
     });

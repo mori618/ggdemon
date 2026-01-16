@@ -37,6 +37,8 @@ export function setupBattleState() {
     gameState.cpu = JSON.parse(JSON.stringify(baseCpu));
     gameState.cpu.effects = [];
     gameState.cpu.tempAtk = gameState.cpu.tempGrdC = gameState.cpu.tempChgE = gameState.cpu.tempChgC = gameState.cpu.tempDmgReduce = 0;
+    gameState.cpuHistory = [];
+
 
     document.getElementById('cmd-SKILL').classList.toggle('hidden', gameState.gameMode !== 'tower');
     document.getElementById('tower-indicator').classList.toggle('hidden', gameState.gameMode !== 'tower');
@@ -108,7 +110,9 @@ export function getCpuMove() {
         floor: gameState.floor,
         cHP: gameState.cHP,
         pHP: gameState.pHP,
-        playerHistory: gameState.playerHistory
+        playerHistory: gameState.playerHistory,
+        cpuHistory: gameState.cpuHistory
+
     });
 }
 
@@ -148,6 +152,10 @@ export function executeTurn(pM, cM) {
 
     gameState.playerHistory.push(pM);
     if (gameState.playerHistory.length > 5) gameState.playerHistory.shift();
+
+    gameState.cpuHistory.push(cM);
+    if (gameState.cpuHistory.length > 5) gameState.cpuHistory.shift();
+
 
     // UI Reveal (Dialog)
     const dialogOverlay = document.getElementById('battle-dialog-overlay');

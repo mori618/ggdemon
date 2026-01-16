@@ -45,7 +45,9 @@ export const SKILLS = [
     { id: 'HEAL', name: 'ヒール', category: 'CHARGE', description: 'HPを ? 回復する。', costRange: [3, 5], effectRanges: [[2, 4]] },
     { id: 'SNATCH', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪う。', costRange: [2, 4], effectRanges: [[1, 2]] },
     { id: 'VAMPIRE', name: '吸血', category: 'ATTACK', description: '与えたダメージの ?% を回復する。', costRange: [3, 5], effectRanges: [[50, 100]] },
-    { id: 'DOOM', name: '死の宣告', category: 'SPECIAL', description: '? ターン後に ? ダメージを与える時限爆弾を付与。', costRange: [3, 5], effectRanges: [[2, 3], [5, 8]] }
+    { id: 'DOOM', name: '死の宣告', category: 'SPECIAL', description: '? ターン後に ? ダメージを与える時限爆弾を付与。', costRange: [3, 5], effectRanges: [[2, 3], [5, 8]] },
+    { id: 'CURSE', name: '呪縛', category: 'SPECIAL', description: '敵に ? ターンの間、同じ行動を連続で取れなくする呪いをかける。', costRange: [3, 4], effectRanges: [[3, 5]] }
+
 ];
 
 export const ITEM_EFFECTS = {
@@ -84,7 +86,9 @@ export const EFFECT_ICONS = {
     'DMG_REDUCE': { icon: 'shield-check', color: 'text-emerald-400' },
     'POISON': { icon: 'biohazard', color: 'text-lime-400' },
     'DOOM': { icon: 'skull', color: 'text-purple-600' },
-    'SKILL_SEAL': { icon: 'lock', color: 'text-slate-400' }
+    'SKILL_SEAL': { icon: 'lock', color: 'text-slate-400' },
+    'BIND': { icon: 'link', color: 'text-indigo-400' }
+
 };
 
 export const GAME_MODES = {
@@ -116,5 +120,7 @@ export const PASSIVE_SKILLS = [
     { id: 'LONG_ROAD', name: '長き道', apply: (cpu, player) => { player.winE = Math.floor(player.winE * 1.5); }, description: 'プレイヤーWinE1.5倍' },
     { id: 'SILENCE', name: '沈黙', apply: (cpu, player) => { player.effects.push({ type: 'SKILL_SEAL', amount: 0, turns: 3 }); }, description: '3ターンスキル不可' },
     { id: 'HEAVY_WEIGHT', name: '重枷', apply: (cpu, player) => { player.atkC += 1; }, description: 'プレイヤー攻撃コスト+1' },
-    { id: 'LEAK', name: '漏出', apply: (cpu, player) => { player.startE = Math.floor(player.startE * 0.5); }, description: 'プレイヤー初期エナジー半減' }
+    { id: 'LEAK', name: '漏出', apply: (cpu, player) => { player.startE = Math.floor(player.startE * 0.5); }, description: 'プレイヤー初期エナジー半減' },
+    { id: 'CURSED_BODY', name: '呪いの体', apply: (cpu, player) => { player.effects.push({ type: 'BIND', amount: 0, turns: 99 }); }, description: 'プレイヤー行動制限(呪縛)' }
+
 ];

@@ -62,6 +62,8 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             case 'PARALYZE': if (cpuMove === 'GUARD') { cEffects.push({ type: 'GRDC_UP', amount: val1, turns: 3 }); } break;
             case 'POISON': if (cpuMove !== 'GUARD') { cEffects.push({ type: 'POISON', trigger: val1, damage: val2, turns: 99 }); } break;
             case 'DOOM': cEffects.push({ type: 'DOOM', damage: val2, turns: val1 }); break; // New (Correct timing)
+            case 'CURSE': cEffects.push({ type: 'BIND', amount: 0, turns: val1 }); break;
+
         }
     }
 
@@ -154,7 +156,7 @@ export function updateEffects(effects) {
     return { effects: active, expired, totals };
 }
 
-export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory }) {
+export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory, cpuHistory }) {
     const pAtk = player.atk + (player.tempAtk || 0);
     const cAtk = cpu.atk + (cpu.tempAtk || 0);
     const cGrdC = Math.max(0, cpu.grdC + (cpu.tempGrdC || 0));
@@ -236,6 +238,28 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
 
     if (pool.length === 0) return 'CHARGE';
 
+    // 呪縛(BIND)チェック: 直前の行動を禁止
+    const isBound = cpu.effects.some(e => e.type === 'BIND');
+    if (isBound && cpuHistory && cpuHistory.length > 0) {
+        const lastMove = cpuHistory[cpuHistory.length - 1];
+        // poolからlastMoveを除外
+        pool = pool.filter(m => m !== lastMove);
+
+        if (pool.length === 0) {
+            // 選択肢がなくなった場合（ソフトロック回避）
+            // 直前の行動以外で実行可能なものを探す
+            // 優先順: CHARGE > GUARD > ATTACK
+            if (lastMove !== 'CHARGE' && (canCCharge || cEnergy >= cChgC)) return 'CHARGE';
+            if (lastMove !== 'GUARD' && canCGuard) return 'GUARD';
+            if (lastMove !== 'ATTACK' && canCAttack) return 'ATTACK';
+
+            // それでも候補がない場合（全行動コスト不足かつCHARGEが禁止など）
+            // エネルギー不足を無視してCHARGE（またはGUARD）を強制する
+            if (lastMove !== 'CHARGE') return 'CHARGE';
+            return 'GUARD';
+        }
+    }
+
     // 選択された行動のエネルギーチェック
     let selectedMove = pool[Math.floor(Math.random() * pool.length)];
 
@@ -244,6 +268,7 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
     if (selectedMove === 'GUARD' && !canCGuard) selectedMove = 'CHARGE';
 
     return selectedMove;
+
 }
 
 export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
