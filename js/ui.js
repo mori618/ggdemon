@@ -376,3 +376,96 @@ export function showPassiveAlert(name, desc) {
         setTimeout(() => document.body.removeChild(overlay), 500);
     }, 2500);
 }
+
+export function showDamageNumber(targetId, amount, type = 'DAMAGE') {
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    // Position calculation
+    const rect = targetEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 3; // Upper part
+
+    const dmgEl = document.createElement('div');
+    dmgEl.className = 'damage-number';
+    dmgEl.style.left = `${centerX}px`;
+    dmgEl.style.top = `${centerY}px`;
+    dmgEl.innerText = amount;
+
+    if (type === 'HEAL') {
+        dmgEl.style.color = '#34d399';
+        dmgEl.innerText = `+${amount}`;
+        dmgEl.style.textShadow = '0 0 5px #059669';
+    }
+
+    document.body.appendChild(dmgEl);
+
+    setTimeout(() => {
+        if (dmgEl.parentNode) document.body.removeChild(dmgEl);
+    }, 1000);
+}
+
+export function showActionAnim(targetId, type) {
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'anim-overlay';
+
+    // Position relative to target
+    const rect = targetEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    overlay.style.left = `${centerX}px`;
+    overlay.style.top = `${centerY}px`;
+
+    let icon = '', animClass = '';
+
+    if (type === 'ATTACK') {
+        icon = 'sword';
+        animClass = 'effect-slash';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-white"></i>`;
+    } else if (type === 'GUARD') {
+        icon = 'shield';
+        animClass = 'effect-shield';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'CHARGE') {
+        icon = 'zap';
+        animClass = 'effect-charge';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'CLASH') {
+        icon = 'sparkles'; // or 'zap-off'?? 'crosshair'?
+        animClass = 'effect-clash';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-white"></i>`;
+    } else if (type === 'BLOCK') {
+        icon = 'shield';
+        animClass = 'effect-block';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'ATTACK_HEAVY') {
+        icon = 'sword';
+        animClass = 'effect-slash-heavy';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-rose-500"></i>`;
+    } else if (type === 'ATTACK_BLOCKED') {
+        icon = 'sword';
+        animClass = 'effect-slash-blocked';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-slate-400"></i>`;
+    } else if (type === 'GUARD_WEAK') {
+        icon = 'shield';
+        animClass = 'effect-guard-weak';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'BLOCK_HEAVY') {
+        icon = 'shield';
+        animClass = 'effect-block';
+        // Reuse block but maybe add a class to make it brighter/bigger if needed?
+        // For now standard block is fine or we can add a modifier
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} drop-shadow-[0_0_15px_rgba(56,189,248,1)]"></i>`;
+    }
+
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        if (overlay.parentNode) document.body.removeChild(overlay);
+    }, 1000);
+}

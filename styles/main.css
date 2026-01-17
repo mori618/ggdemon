@@ -470,3 +470,308 @@ body {
         opacity: 1;
     }
 }
+
+/* --- BATTLE ANIMATION EXTENSIONS --- */
+
+.damage-number {
+    position: absolute;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 2rem;
+    color: #fff;
+    text-shadow: 0 0 5px #f43f5e;
+    pointer-events: none;
+    z-index: 100;
+    animation: floatUp 1s ease-out forwards;
+}
+
+@keyframes floatUp {
+    0% {
+        transform: translate(-50%, 0) scale(0.5);
+        opacity: 0;
+    }
+
+    20% {
+        transform: translate(-50%, -20px) scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -60px) scale(1);
+        opacity: 0;
+    }
+}
+
+.anim-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =========================================
+   BATTLE ANIMATION EFFECTS
+   ========================================= */
+
+/* SLASH ANIMATION */
+/* 発動条件: 通常の「攻撃」を行ったとき */
+.effect-slash {
+    width: 60px;
+    height: 60px;
+    animation: slash 0.3s ease-out forwards;
+    filter: drop-shadow(0 0 10px rgba(244, 63, 94, 0.8));
+}
+
+@keyframes slash {
+    0% {
+        /* 開始: 小さく、回転して、見えない状態 */
+        transform: translate(-50%, -50%) scale(0) rotate(-45deg);
+        opacity: 0;
+    }
+
+    50% {
+        /* ヒット: 完全に表示され、インパクトを与える */
+        opacity: 1;
+    }
+
+    100% {
+        /* 終了: 拡大し、さらに回転しながら消えていく */
+        transform: translate(-50%, -50%) scale(1.2) rotate(45deg);
+        opacity: 0;
+    }
+}
+
+/* SHIELD PULSE */
+/* 発動条件: 通常の「防御」を行ったとき */
+.effect-shield {
+    color: #38bdf8;
+    width: 60px;
+    height: 60px;
+    animation: shield-pulse 0.6s ease-out forwards;
+}
+
+@keyframes shield-pulse {
+    0% {
+        /* 開始: 中心から小さい状態で始まる */
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+    }
+
+    50% {
+        /* 展開: 外側へ大きく広がる（シールド展開） */
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0.8;
+    }
+
+    100% {
+        /* 終了: 最大まで広がり、薄くなって消える */
+        transform: translate(-50%, -50%) scale(2.0);
+        opacity: 0;
+    }
+}
+
+/* CHARGE AURA */
+/* 発動条件: 「チャージ」を行ったとき */
+.effect-charge {
+    color: #fbbf24;
+    width: 80px;
+    height: 80px;
+    animation: charge-aura 0.8s ease-out forwards;
+}
+
+@keyframes charge-aura {
+    0% {
+        /* 開始: 小さな光 */
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+    }
+
+    20% {
+        /* パワーアップ: 急速に拡大し、エネルギーが満ちる */
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        /* 収束: 自分の中に力を取り込むように縮んで消える */
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+}
+
+/* CLASH ANIMATION */
+/* 発動条件: 「攻撃」vs「攻撃」で、攻撃力が等しいか低い側（相殺/負け） */
+.effect-clash {
+    width: 50px;
+    height: 50px;
+    animation: clash-spark 0.2s ease-out forwards;
+    filter: drop-shadow(0 0 15px rgba(251, 191, 36, 1));
+}
+
+@keyframes clash-spark {
+    0% {
+        /* 開始: 衝突点での小さな火花 */
+        transform: translate(-50%, -50%) scale(0.2);
+        opacity: 1;
+    }
+
+    50% {
+        /* 閃光: 衝撃で急速に広がる */
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        /* 余韻: 少し落ち着きながら消える */
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+    }
+}
+
+/* BLOCK ANIMATION */
+/* 発動条件: 「防御」vs「攻撃」で、防御側が攻撃を防いだとき（防御側） */
+.effect-block {
+    width: 80px;
+    height: 80px;
+    color: #bae6fd;
+    animation: block-impact 0.4s ease-out forwards;
+}
+
+@keyframes block-impact {
+    0% {
+        /* 開始: 衝撃を受けて少し潰れる（弾力表現） */
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+
+    20% {
+        /* 反動: 衝撃を弾き返すために膨らむ */
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        /* 安定: 通常の形に戻って消える */
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+    }
+}
+
+/* ATTACK VARIANTS */
+
+/* HEAVY SLASH */
+/* 発動条件: 
+   1. 「攻撃」vs「チャージ/無防備」のとき（大ダメージ）
+   2. 「攻撃」vs「攻撃」で、攻撃力が高い側（打ち勝ち） 
+*/
+.effect-slash-heavy {
+    width: 70px;
+    height: 70px;
+    animation: slash-heavy 0.4s ease-out forwards;
+    filter: drop-shadow(0 0 15px rgba(220, 38, 38, 1));
+}
+
+@keyframes slash-heavy {
+    0% {
+        /* 溜め: 大きく振りかぶる動作 */
+        transform: translate(-50%, -50%) scale(0.5) rotate(-60deg);
+        opacity: 0;
+    }
+
+    40% {
+        /* 強打: インパクトの瞬間、大きく表示 */
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.5) rotate(0deg);
+    }
+
+    100% {
+        /* 振り抜き: 勢いよく振り抜いて消える */
+        transform: translate(-50%, -50%) scale(1.2) rotate(45deg);
+        opacity: 0;
+    }
+}
+
+/* BLOCKED SLASH */
+/* 発動条件: 「攻撃」vs「防御」で、攻撃が防がれたとき（攻撃側） */
+.effect-slash-blocked {
+    width: 80px;
+    height: 80px;
+    animation: slash-blocked 0.3s ease-out forwards;
+    opacity: 0.7;
+}
+
+@keyframes slash-blocked {
+    0% {
+        /* 接触: 斜めから当たる */
+        transform: translate(-50%, -50%) scale(0) rotate(-45deg);
+        opacity: 0;
+    }
+
+    50% {
+        /* ヒット: 一瞬表示されるが勢いは止まる */
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+        opacity: 1;
+    }
+
+    100% {
+        /* 弾かれ: 勢いを失い、縮みながら逸れる */
+        transform: translate(-50%, -50%) scale(0.5) rotate(-20deg);
+        opacity: 0;
+    }
+}
+
+/* GUARD VARIANTS */
+
+/* WEAK GUARD */
+/* 発動条件: 「防御」vs「攻撃以外（チャージなど）」で、防御が無駄になったとき */
+.effect-guard-weak {
+    color: #7dd3fc;
+    width: 80px;
+    height: 80px;
+    animation: guard-weak 0.5s ease-out forwards;
+    opacity: 0.5;
+}
+
+@keyframes guard-weak {
+    0% {
+        /* 開始: 弱々しく始まる */
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+    }
+
+    50% {
+        /* 表示: 一瞬だけ広がる */
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.5;
+    }
+
+    100% {
+        /* 消失: すぐに消えてしまう */
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+}
+
+/* TARGET HIGHLIGHT */
+.zone-target {
+    animation: target-flash 0.3s ease-in-out;
+}
+
+@keyframes target-flash {
+    0% {
+        filter: brightness(1);
+    }
+
+    50% {
+        filter: brightness(2) drop-shadow(0 0 10px red);
+    }
+
+    100% {
+        filter: brightness(1);
+    }
+}

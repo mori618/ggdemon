@@ -1,7 +1,7 @@
 import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS } from './constants.js';
 import { gameState, saveHighStreak } from './utils.js';
 import { sound } from './sounds.js';
-import { setMessage, updateUI, initEnergy, showPassiveAlert } from './ui.js';
+import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
 import { calculateTurnResult, updateEffects, getCpuMoveLogic, generateTowerEnemy } from './logic.js';
 
 export function setupBattleState() {
@@ -244,10 +244,97 @@ export function executeTurn(pM, cM) {
                 pM, currentCM, gameState.playerSkill
             );
 
-            // Sound effects
-            if (pM === 'CHARGE') sound.playSE('charge');
-            if (pM === 'ATTACK') sound.playSE('attack');
-            if (pM === 'GUARD') sound.playSE('guard');
+            // Sound effects & Interaction Animations
+            let pAnim = pM, cAnim = currentCM;
+
+            // --- Player vs CPU Interaction Logic ---
+            const isHeavyTarget = (move) => (move === 'CHARGE' || move === 'SKILL' || move === 'SKIP'); // Moves that leave open to heavy hit
+
+            // 1. Attack vs Attack -> Clash (Winner Logic)
+            if (pM === 'ATTACK' && currentCM === 'ATTACK') {
+                // Calculate temporary total attack for comparison (ignoring defense for visual supremacy)
+                // Note: Actual damage calc uses defense, but visual 'clash win' is pure force.
+                // We need to access current turn buffed stats? 
+                // We can approximate or use base + temp.
+                // Better to check `result` or `gameState` if updated? 
+                // `gameState` is updated *after* `calculateTurnResult` returns but *before* this block is finalized?
+                // Wait, `calculateTurnResult` returns new state. 
+                // Let's use `gameState.player.atk` + `gameState.player.effects` (if any? tempAtk is in player object?)
+                // Actually `calculateTurnResult` uses `player` object passed in.
+                // To match exactly, let's just grab the ATK values from the objects we passed to calculateTurnResult.
+                // Or easier:
+                const pAtk = (gameState.player.atk || 0) + (gameState.player.tempAtk || 0);
+                const cAtk = (gameState.cpu.atk || 0) + (gameState.cpu.tempAtk || 0);
+
+                if (pAtk > cAtk) {
+                    pAnim = 'ATTACK_HEAVY'; // Player wins clash
+                    cAnim = 'CLASH';        // CPU sparks
+                } else if (cAtk > pAtk) {
+                    cAnim = 'ATTACK_HEAVY'; // CPU wins clash
+                    pAnim = 'CLASH';        // Player sparks
+                } else {
+                    pAnim = 'CLASH'; cAnim = 'CLASH'; // Even
+                }
+                sound.playSE('clash');
+            }
+            // 2. Attack vs Guard -> Blocked Attack
+            else if (pM === 'ATTACK' && currentCM === 'GUARD') {
+                pAnim = 'ATTACK_BLOCKED'; // Player attack starts but is blocked
+                cAnim = 'BLOCK_HEAVY';    // CPU blocks heavily
+                sound.playSE('guard');
+            }
+            else if (pM === 'GUARD' && currentCM === 'ATTACK') {
+                cAnim = 'ATTACK_BLOCKED'; // CPU attack starts but is blocked
+                pAnim = 'BLOCK_HEAVY';    // Player blocks heavily
+                sound.playSE('guard');
+            }
+            // 3. Attack vs Charge/Skill/Skip -> Heavy Hit
+            else if (pM === 'ATTACK' && isHeavyTarget(currentCM)) {
+                pAnim = 'ATTACK_HEAVY'; // Player hits hard
+            }
+            else if (isHeavyTarget(pM) && currentCM === 'ATTACK') {
+                cAnim = 'ATTACK_HEAVY'; // CPU hits hard
+            }
+            // 4. Guard vs Non-Attack -> Weak Guard (Wasted)
+            else if (pM === 'GUARD' && currentCM !== 'ATTACK') {
+                pAnim = 'GUARD_WEAK';
+            }
+            else if (currentCM === 'GUARD' && pM !== 'ATTACK') {
+                cAnim = 'GUARD_WEAK';
+            }
+
+            // Execute Animations Helper
+            const animMap = {
+                'CHARGE': { sound: 'charge', targetSelf: true },
+                'GUARD': { sound: 'guard', targetSelf: true },
+                'ATTACK': { sound: 'attack', targetSelf: false },
+                'ATTACK_HEAVY': { sound: 'attack', targetSelf: false },
+                'CLASH': { targetSelf: false },
+                'BLOCK': { sound: 'guard', targetSelf: true },
+                'BLOCK_HEAVY': { sound: 'guard', targetSelf: true },
+                'ATTACK_BLOCKED': { targetSelf: false },
+                'GUARD_WEAK': { sound: 'guard', targetSelf: true }
+            };
+
+            const runAnim = (anim, isPlayer) => {
+                if (!anim) return;
+                const conf = animMap[anim];
+                const selfId = isPlayer ? 'player-icon-container' : 'cpu-icon-container';
+                const enemyId = isPlayer ? 'cpu-icon-container' : 'player-icon-container';
+
+                if (conf && conf.sound) sound.playSE(conf.sound);
+
+                // Determine target element
+                let targetId = selfId;
+                if (conf && conf.targetSelf === false) targetId = enemyId;
+                if (anim === 'CLASH') targetId = enemyId;
+
+                showActionAnim(targetId, anim);
+            };
+
+            runAnim(pAnim, true);
+            runAnim(cAnim, false);
+
             if (result.pDmgTaken > 0 || result.cDmgTaken > 0) sound.playSE('clash');
 
             // Apply results immediately
@@ -258,8 +345,14 @@ export function executeTurn(pM, cM) {
             gameState.player.effects = result.pEffects;
             gameState.cpu.effects = result.cEffects;
 
-            if (result.pDmgTaken > 0) pC.classList.add('shake');
-            if (result.cDmgTaken > 0) cC.classList.add('shake');
+            if (result.pDmgTaken > 0) {
+                pC.classList.add('shake');
+                showDamageNumber('player-icon-container', result.pDmgTaken, 'DAMAGE');
+            }
+            if (result.cDmgTaken > 0) {
+                cC.classList.add('shake');
+                showDamageNumber('cpu-icon-container', result.cDmgTaken, 'DAMAGE');
+            }
         }
 
         updateUI();
