@@ -63,7 +63,27 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             case 'POISON': if (cpuMove !== 'GUARD') { cEffects.push({ type: 'POISON', trigger: val1, damage: val2, turns: 99 }); } break;
             case 'DOOM': cEffects.push({ type: 'DOOM', damage: val2, turns: val1 }); break; // New (Correct timing)
             case 'CURSE': cEffects.push({ type: 'BIND', amount: 0, turns: val1 }); break;
+            case 'ZERO_FORM': pEnergy += val1; pEffects.push({ type: 'GUARD_SEAL', amount: 0, turns: val2 }); break;
+            case 'GRAVITY_ZONE':
+                pEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 });
+                cEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 });
+                break;
+            case 'MIRAGE':
+                const mirageMult = playerSkill.rarity === 'LEGENDARY' ? 0.5 : 1.0;
+                pEffects.push({ type: 'INVINCIBLE_STORE', stored: 0, amount: mirageMult, turns: val1 });
+                break;
+            case 'PHANTOM_STEP': pEffects.push({ type: 'DOUBLE_ACTION', amount: 0, turns: val1 }); break;
+        }
+    }
 
+    // 2.5 Special Charge Skills (GAMBLER logic)
+    if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'GAMBLER') {
+        const isLegendary = playerSkill.rarity === 'LEGENDARY';
+        const minFn = isLegendary ? 5 : 1;
+        const roll = Math.floor(Math.random() * (10 - minFn + 1)) + minFn;
+        pEnergy += roll;
+        if (roll % 2 !== 0) {
+            pHP = Math.max(0, pHP - 2);
         }
     }
 
@@ -96,6 +116,7 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             if (pAtk > cAtk) cDmgTaken += pAtk;
             else if (cAtk > pAtk) pDmgTaken += cAtk;
         }
+        else if (cpuMove === 'SKIP') cDmgTaken += pAtk; // CPU takes full damage
     }
     // CHARGE系とSPECIAL系スキルは相手の攻撃を受ける
     else if (playerBehavior === 'CHARGE' || playerBehavior === 'SPECIAL') {
@@ -112,12 +133,34 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             case 'ASSAULT': if (cpuMove === 'GUARD') pDmgTaken += val1; else cDmgTaken += val1; break;
             case 'PIERCE': if (cpuMove === 'GUARD') cDmgTaken += val1; break;
             case 'COUNTER': if (cpuMove === 'ATTACK') cDmgTaken += cAtk; break;
+            case 'OVERCLOCK':
+                // Uses CURRENT pEnergy (which was updated in step 1/3) ??
+                // Logic step: Cost consumed at step 1. But 'OVERCLOCK' is ATTACK type. 
+                // So energy is consumed... wait. 
+                // If it's SKILL, cost is consumed.
+                // The description says "Damage equal to CURRENT Energy".
+                // Should use the energy AFTER cost consumption.
+                // Note: user asked for "Cost 2". So if I have 5, pay 2 -> 3. Damage = 3?
+                // Or damage = 5? Usually "Current" implies "at moment of impact".
+                // I'll use the current 'pEnergy' variable which reflects cost consumption.
+                const multiplier = playerSkill.rarity === 'LEGENDARY' ? 1.5 : 1.0;
+                cDmgTaken += Math.floor(pEnergy * multiplier);
+                break;
         }
     }
 
     // 5. Apply Damage Reduction
     pDmgTaken = Math.max(0, pDmgTaken - (player.tempDmgReduce || 0));
     cDmgTaken = Math.max(0, cDmgTaken - (cpu.tempDmgReduce || 0));
+
+    // MIRAGE (Invincible Store) Logic
+    const invincibleEffect = pEffects.find(e => e.type === 'INVINCIBLE_STORE');
+    if (invincibleEffect) {
+        if (pDmgTaken > 0) {
+            invincibleEffect.stored = (invincibleEffect.stored || 0) + pDmgTaken;
+            pDmgTaken = 0; // Nullify damage now
+        }
+    }
 
     // Post-Damage Calculation (VAMPIRE)
     if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'VAMPIRE') {
@@ -279,6 +322,12 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
     if (floor === 0) {
         baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
         aiLevel = 'EASY';
+        // Floor 0 Treasure also has Self-Destruct
+        const selfDestruct = PASSIVE_SKILLS.find(p => p.id === 'SELF_DESTRUCT');
+        if (selfDestruct) {
+            baseCpu.passive = selfDestruct;
+            baseCpu.tagline += ` [${selfDestruct.name}]`;
+        }
         return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: false };
     }
 
@@ -298,6 +347,12 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
     if (isTreasureFloor) {
         baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
         aiLevel = 'EASY';
+        // Treasure Chests ALWAYS have Self-Destruct
+        const selfDestruct = PASSIVE_SKILLS.find(p => p.id === 'SELF_DESTRUCT');
+        if (selfDestruct) {
+            baseCpu.passive = selfDestruct;
+            baseCpu.tagline += ` [${selfDestruct.name}]`;
+        }
         return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: true };
     }
 

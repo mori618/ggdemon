@@ -174,10 +174,11 @@ export function updateUI() {
 
     const isChargeDisabled = pEnergy < pChgC || isProc;
     const isAttackDisabled = pEnergy < player.atkC || isProc;
-    const isGuardDisabled = pEnergy < pGrdC || isProc;
+    const isGuardDisabled = pEnergy < pGrdC || isProc || player.effects.some(e => e.type === 'GUARD_SEAL');
     let isSkillDisabled = true;
 
     // Check for Skill Seal
+    const isSkillSealed = player.effects.some(e => e.type === 'SKILL_SEAL');
     const isSilenced = player.effects.some(e => e.type === 'SKILL_SEAL');
 
     document.getElementById('cmd-CHARGE').classList.toggle('is-disabled', isChargeDisabled);
@@ -314,7 +315,15 @@ export function showCommandDetail(command) {
                 title = playerSkill.name;
                 description = playerSkill.description;
                 icon = 'star';
-                color = 'text-purple-400';
+
+                // Set color based on rarity
+                switch (playerSkill.rarity) {
+                    case 'COMMON': color = 'text-slate-400'; break;
+                    case 'RARE': color = 'text-blue-400'; break;
+                    case 'EPIC': color = 'text-purple-400'; break;
+                    case 'LEGENDARY': color = 'text-amber-400'; break;
+                    default: color = 'text-purple-400'; break;
+                }
             }
             break;
     }
@@ -340,4 +349,30 @@ export function initEnergy() {
     const cb = document.getElementById('cpu-energy-bar'); cb.innerHTML = '';
     const cLimit = cpu.winE;
     for (let i = 0; i < cLimit; i++) cb.innerHTML += '<div class="energy-dot"></div>';
+}
+
+export function showPassiveAlert(name, desc) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed top-24 left-1/2 transform -translate-x-1/2 z-[200] flex flex-col items-center justify-center pointer-events-none animate-bounce-in';
+    overlay.innerHTML = `
+        <div class="bg-slate-900/90 border-2 border-purple-500 rounded-xl p-4 shadow-2xl flex items-center gap-4 backdrop-blur-md min-w-[300px]">
+            <div class="w-12 h-12 bg-purple-900/50 rounded-full flex items-center justify-center border border-purple-400">
+                <i data-lucide="zap" class="w-6 h-6 text-purple-300"></i>
+            </div>
+            <div class="flex-1">
+                <div class="text-[10px] font-orbitron font-bold text-purple-300 tracking-widest uppercase mb-1">Enemy Passive</div>
+                <div class="text-xl font-orbitron font-black text-white italic mb-1">${name}</div>
+                <div class="text-xs text-slate-300 font-bold">${desc}</div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        overlay.style.transition = 'all 0.5s ease-out';
+        overlay.style.opacity = '0';
+        overlay.style.transform = 'translate(-50%, -20px)';
+        setTimeout(() => document.body.removeChild(overlay), 500);
+    }, 2500);
 }

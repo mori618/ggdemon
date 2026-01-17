@@ -1,4 +1,4 @@
-import { CHARACTERS, GAME_MODES, NETWORK_EVENTS } from './constants.js';
+import { CHARACTERS, GAME_MODES, NETWORK_EVENTS, BOSS_CHARACTERS } from './constants.js';
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak, Deck } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
@@ -255,7 +255,7 @@ function handleCharSelect(id) {
 
     // Online Config Handling
     if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-        gameState.pChar = selected;
+        gameState.pChar = JSON.parse(JSON.stringify(selected));
         // Send selection to opponent
         network.send(NETWORK_EVENTS.CHAR_SELECT, { charId: selected.id });
 
@@ -270,8 +270,8 @@ function handleCharSelect(id) {
     }
 
     if (gameState.selectionState === 'PLAYER') {
-        gameState.pChar = selected;
-        if (gameState.gameMode === 'tower') {
+        gameState.pChar = JSON.parse(JSON.stringify(selected));
+        if (gameState.gameMode === GAME_MODES.TOWER) {
             startTower();
         } else {
             gameState.selectionState = 'CPU';
@@ -280,7 +280,7 @@ function handleCharSelect(id) {
             renderChars(handleCharSelect);
         }
     } else {
-        gameState.cChar = selected;
+        gameState.cChar = JSON.parse(JSON.stringify(selected));
         startGame();
     }
 }
