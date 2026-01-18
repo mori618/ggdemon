@@ -23,7 +23,27 @@ export const gameState = {
     playerHistory: [],
     treasureFloorOffset: 0, // Offset within a 5-floor cycle (0-4, but Floor 5/10 are bosses)
     lives: 0,
+    mobDeck: null,
+    bossDeck: null
 };
+
+export class Deck {
+    constructor(items) {
+        this.masterList = [...items];
+        this.currentDeck = [];
+    }
+
+    draw() {
+        if (this.currentDeck.length === 0) {
+            this.currentDeck = this.shuffle([...this.masterList]);
+        }
+        return this.currentDeck.pop();
+    }
+
+    shuffle(array) {
+        return array.sort(() => Math.random() - 0.5);
+    }
+}
 
 export const MAX_HISTORY = 5;
 

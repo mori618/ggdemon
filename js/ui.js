@@ -174,8 +174,12 @@ export function updateUI() {
 
     const isChargeDisabled = pEnergy < pChgC || isProc;
     const isAttackDisabled = pEnergy < player.atkC || isProc;
-    const isGuardDisabled = pEnergy < pGrdC || isProc;
+    const isGuardDisabled = pEnergy < pGrdC || isProc || player.effects.some(e => e.type === 'GUARD_SEAL');
     let isSkillDisabled = true;
+
+    // Check for Skill Seal
+    const isSkillSealed = player.effects.some(e => e.type === 'SKILL_SEAL');
+    const isSilenced = player.effects.some(e => e.type === 'SKILL_SEAL');
 
     document.getElementById('cmd-CHARGE').classList.toggle('is-disabled', isChargeDisabled);
     document.getElementById('cmd-ATTACK').classList.toggle('is-disabled', isAttackDisabled);
@@ -187,7 +191,7 @@ export function updateUI() {
     const skillBtn = document.getElementById('cmd-SKILL');
     if (playerSkill) {
         const pSkillCost = Math.max(0, playerSkill.cost + (gameState.pChar.skillCostBonus || 0));
-        isSkillDisabled = pEnergy < pSkillCost || isProc;
+        isSkillDisabled = pEnergy < pSkillCost || isProc || isSilenced;
         document.getElementById('badge-skill-val').innerText = String(pSkillCost);
         document.getElementById('eff-skill').innerText = playerSkill.name;
         checkC('badge-skill-val', pSkillCost);
@@ -196,20 +200,59 @@ export function updateUI() {
         document.getElementById('badge-skill-val').innerText = '-';
         document.getElementById('eff-skill').innerText = 'NO SKILL';
     }
-    skillBtn.classList.toggle('is-disabled', isSkillDisabled);
+
+    const isBound = player.effects.some(e => e.type === 'BIND');
+    let lastMove = null;
+    if (gameState.playerHistory.length > 0) {
+        lastMove = gameState.playerHistory[gameState.playerHistory.length - 1];
+    }
+
+    // 各アクションの実行可否を判定
+    const canDoCharge = !isChargeDisabled && !(isBound && lastMove === 'CHARGE');
+    const canDoAttack = !isAttackDisabled && !(isBound && lastMove === 'ATTACK');
+    const canDoGuard = !isGuardDisabled && !(isBound && lastMove === 'GUARD');
+    const canDoSkill = !isSkillDisabled && !(isBound && lastMove === 'SKILL');
+
+    // ソフトロック判定: 全ての行動が不可能な場合
+    let forceEnable = null;
+    if (!canDoCharge && !canDoAttack && !canDoGuard && !canDoSkill && !isProc) {
+        // ソフトロック回避: 直前の行動以外を強制許可（コスト無視）
+        // CHARGEが可能(直前でない)ならCHARGE、そうでなければGUARD
+        if (lastMove !== 'CHARGE') forceEnable = 'CHARGE';
+        else forceEnable = 'GUARD';
+    }
+
+    skillBtn.classList.toggle('is-disabled', !canDoSkill && forceEnable !== 'SKILL');
 
     let canConfirm = false;
     if (selectedCmd && !isProc) {
-        switch (selectedCmd) {
-            case 'CHARGE': canConfirm = !isChargeDisabled; break;
-            case 'ATTACK': canConfirm = !isAttackDisabled; break;
-            case 'GUARD': canConfirm = !isGuardDisabled; break;
-            case 'SKILL': canConfirm = !isSkillDisabled; break;
+        // 強制有効化されたコマンドなら許可
+        if (selectedCmd === forceEnable) {
+            canConfirm = true;
+        } else {
+            switch (selectedCmd) {
+                case 'CHARGE': canConfirm = canDoCharge; break;
+                case 'ATTACK': canConfirm = canDoAttack; break;
+                case 'GUARD': canConfirm = canDoGuard; break;
+                case 'SKILL': canConfirm = canDoSkill; break;
+            }
         }
     }
+
     document.getElementById('btn-ready').disabled = !canConfirm;
     ['CHARGE', 'ATTACK', 'GUARD', 'SKILL'].forEach(c => {
         const b = document.getElementById(`cmd-${c}`);
+
+        let isDisabled = false;
+        if (c === 'CHARGE') isDisabled = !canDoCharge;
+        if (c === 'ATTACK') isDisabled = !canDoAttack;
+        if (c === 'GUARD') isDisabled = !canDoGuard;
+        if (c === 'SKILL') isDisabled = !canDoSkill;
+
+        // Force EnableならDisabled解除
+        if (c === forceEnable) isDisabled = false;
+
+        b.classList.toggle('is-disabled', isDisabled);
         if (selectedCmd === c) b.classList.add('selected');
         else b.classList.remove('selected');
     });
@@ -272,7 +315,15 @@ export function showCommandDetail(command) {
                 title = playerSkill.name;
                 description = playerSkill.description;
                 icon = 'star';
-                color = 'text-purple-400';
+
+                // Set color based on rarity
+                switch (playerSkill.rarity) {
+                    case 'COMMON': color = 'text-slate-400'; break;
+                    case 'RARE': color = 'text-blue-400'; break;
+                    case 'EPIC': color = 'text-purple-400'; break;
+                    case 'LEGENDARY': color = 'text-amber-400'; break;
+                    default: color = 'text-purple-400'; break;
+                }
             }
             break;
     }
@@ -298,4 +349,123 @@ export function initEnergy() {
     const cb = document.getElementById('cpu-energy-bar'); cb.innerHTML = '';
     const cLimit = cpu.winE;
     for (let i = 0; i < cLimit; i++) cb.innerHTML += '<div class="energy-dot"></div>';
+}
+
+export function showPassiveAlert(name, desc) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed top-24 left-1/2 transform -translate-x-1/2 z-[200] flex flex-col items-center justify-center pointer-events-none animate-bounce-in';
+    overlay.innerHTML = `
+        <div class="bg-slate-900/90 border-2 border-purple-500 rounded-xl p-4 shadow-2xl flex items-center gap-4 backdrop-blur-md min-w-[300px]">
+            <div class="w-12 h-12 bg-purple-900/50 rounded-full flex items-center justify-center border border-purple-400">
+                <i data-lucide="zap" class="w-6 h-6 text-purple-300"></i>
+            </div>
+            <div class="flex-1">
+                <div class="text-[10px] font-orbitron font-bold text-purple-300 tracking-widest uppercase mb-1">Enemy Passive</div>
+                <div class="text-xl font-orbitron font-black text-white italic mb-1">${name}</div>
+                <div class="text-xs text-slate-300 font-bold">${desc}</div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        overlay.style.transition = 'all 0.5s ease-out';
+        overlay.style.opacity = '0';
+        overlay.style.transform = 'translate(-50%, -20px)';
+        setTimeout(() => document.body.removeChild(overlay), 500);
+    }, 2500);
+}
+
+export function showDamageNumber(targetId, amount, type = 'DAMAGE') {
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    // Position calculation
+    const rect = targetEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 3; // Upper part
+
+    const dmgEl = document.createElement('div');
+    dmgEl.className = 'damage-number';
+    dmgEl.style.left = `${centerX}px`;
+    dmgEl.style.top = `${centerY}px`;
+    dmgEl.innerText = amount;
+
+    if (type === 'HEAL') {
+        dmgEl.style.color = '#34d399';
+        dmgEl.innerText = `+${amount}`;
+        dmgEl.style.textShadow = '0 0 5px #059669';
+    }
+
+    document.body.appendChild(dmgEl);
+
+    setTimeout(() => {
+        if (dmgEl.parentNode) document.body.removeChild(dmgEl);
+    }, 1000);
+}
+
+export function showActionAnim(targetId, type) {
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'anim-overlay';
+
+    // Position relative to target
+    const rect = targetEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    overlay.style.left = `${centerX}px`;
+    overlay.style.top = `${centerY}px`;
+
+    let icon = '', animClass = '';
+
+    if (type === 'ATTACK') {
+        icon = 'sword';
+        animClass = 'effect-slash';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-white"></i>`;
+    } else if (type === 'GUARD') {
+        icon = 'shield';
+        animClass = 'effect-shield';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'CHARGE') {
+        icon = 'zap';
+        animClass = 'effect-charge';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'CLASH') {
+        icon = 'sparkles'; // or 'zap-off'?? 'crosshair'?
+        animClass = 'effect-clash';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-white"></i>`;
+    } else if (type === 'BLOCK') {
+        icon = 'shield';
+        animClass = 'effect-block';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'ATTACK_HEAVY') {
+        icon = 'sword';
+        animClass = 'effect-slash-heavy';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-rose-500"></i>`;
+    } else if (type === 'ATTACK_BLOCKED') {
+        icon = 'sword';
+        animClass = 'effect-slash-blocked';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} text-slate-400"></i>`;
+    } else if (type === 'GUARD_WEAK') {
+        icon = 'shield';
+        animClass = 'effect-guard-weak';
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass}"></i>`;
+    } else if (type === 'BLOCK_HEAVY') {
+        icon = 'shield';
+        animClass = 'effect-block';
+        // Reuse block but maybe add a class to make it brighter/bigger if needed?
+        // For now standard block is fine or we can add a modifier
+        overlay.innerHTML = `<i data-lucide="${icon}" class="${animClass} drop-shadow-[0_0_15px_rgba(56,189,248,1)]"></i>`;
+    }
+
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        if (overlay.parentNode) document.body.removeChild(overlay);
+    }, 1000);
 }

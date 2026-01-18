@@ -1,3 +1,5 @@
+import { CHARACTERS, BOSS_CHARACTERS, TREASURE_MONSTER, ENEMY_TRAITS, PASSIVE_SKILLS } from './constants.js';
+
 /**
  * Battle Charge core game logic.
  * Decoupled from DOM and UI for testability.
@@ -60,6 +62,28 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             case 'PARALYZE': if (cpuMove === 'GUARD') { cEffects.push({ type: 'GRDC_UP', amount: val1, turns: 3 }); } break;
             case 'POISON': if (cpuMove !== 'GUARD') { cEffects.push({ type: 'POISON', trigger: val1, damage: val2, turns: 99 }); } break;
             case 'DOOM': cEffects.push({ type: 'DOOM', damage: val2, turns: val1 }); break; // New (Correct timing)
+            case 'CURSE': cEffects.push({ type: 'BIND', amount: 0, turns: val1 }); break;
+            case 'ZERO_FORM': pEnergy += val1; pEffects.push({ type: 'GUARD_SEAL', amount: 0, turns: val2 }); break;
+            case 'GRAVITY_ZONE':
+                pEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 });
+                cEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 });
+                break;
+            case 'MIRAGE':
+                const mirageMult = playerSkill.rarity === 'LEGENDARY' ? 0.5 : 1.0;
+                pEffects.push({ type: 'INVINCIBLE_STORE', stored: 0, amount: mirageMult, turns: val1 });
+                break;
+            case 'PHANTOM_STEP': pEffects.push({ type: 'DOUBLE_ACTION', amount: 0, turns: val1 }); break;
+        }
+    }
+
+    // 2.5 Special Charge Skills (GAMBLER logic)
+    if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'GAMBLER') {
+        const isLegendary = playerSkill.rarity === 'LEGENDARY';
+        const minFn = isLegendary ? 5 : 1;
+        const roll = Math.floor(Math.random() * (10 - minFn + 1)) + minFn;
+        pEnergy += roll;
+        if (roll % 2 !== 0) {
+            pHP = Math.max(0, pHP - 2);
         }
     }
 
@@ -92,6 +116,7 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             if (pAtk > cAtk) cDmgTaken += pAtk;
             else if (cAtk > pAtk) pDmgTaken += cAtk;
         }
+        else if (cpuMove === 'SKIP') cDmgTaken += pAtk; // CPU takes full damage
     }
     // CHARGE系とSPECIAL系スキルは相手の攻撃を受ける
     else if (playerBehavior === 'CHARGE' || playerBehavior === 'SPECIAL') {
@@ -108,12 +133,34 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
             case 'ASSAULT': if (cpuMove === 'GUARD') pDmgTaken += val1; else cDmgTaken += val1; break;
             case 'PIERCE': if (cpuMove === 'GUARD') cDmgTaken += val1; break;
             case 'COUNTER': if (cpuMove === 'ATTACK') cDmgTaken += cAtk; break;
+            case 'OVERCLOCK':
+                // Uses CURRENT pEnergy (which was updated in step 1/3) ??
+                // Logic step: Cost consumed at step 1. But 'OVERCLOCK' is ATTACK type. 
+                // So energy is consumed... wait. 
+                // If it's SKILL, cost is consumed.
+                // The description says "Damage equal to CURRENT Energy".
+                // Should use the energy AFTER cost consumption.
+                // Note: user asked for "Cost 2". So if I have 5, pay 2 -> 3. Damage = 3?
+                // Or damage = 5? Usually "Current" implies "at moment of impact".
+                // I'll use the current 'pEnergy' variable which reflects cost consumption.
+                const multiplier = playerSkill.rarity === 'LEGENDARY' ? 1.5 : 1.0;
+                cDmgTaken += Math.floor(pEnergy * multiplier);
+                break;
         }
     }
 
     // 5. Apply Damage Reduction
     pDmgTaken = Math.max(0, pDmgTaken - (player.tempDmgReduce || 0));
     cDmgTaken = Math.max(0, cDmgTaken - (cpu.tempDmgReduce || 0));
+
+    // MIRAGE (Invincible Store) Logic
+    const invincibleEffect = pEffects.find(e => e.type === 'INVINCIBLE_STORE');
+    if (invincibleEffect) {
+        if (pDmgTaken > 0) {
+            invincibleEffect.stored = (invincibleEffect.stored || 0) + pDmgTaken;
+            pDmgTaken = 0; // Nullify damage now
+        }
+    }
 
     // Post-Damage Calculation (VAMPIRE)
     if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'VAMPIRE') {
@@ -152,7 +199,7 @@ export function updateEffects(effects) {
     return { effects: active, expired, totals };
 }
 
-export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory }) {
+export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory, cpuHistory }) {
     const pAtk = player.atk + (player.tempAtk || 0);
     const cAtk = cpu.atk + (cpu.tempAtk || 0);
     const cGrdC = Math.max(0, cpu.grdC + (cpu.tempGrdC || 0));
@@ -234,6 +281,28 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
 
     if (pool.length === 0) return 'CHARGE';
 
+    // 呪縛(BIND)チェック: 直前の行動を禁止
+    const isBound = cpu.effects.some(e => e.type === 'BIND');
+    if (isBound && cpuHistory && cpuHistory.length > 0) {
+        const lastMove = cpuHistory[cpuHistory.length - 1];
+        // poolからlastMoveを除外
+        pool = pool.filter(m => m !== lastMove);
+
+        if (pool.length === 0) {
+            // 選択肢がなくなった場合（ソフトロック回避）
+            // 直前の行動以外で実行可能なものを探す
+            // 優先順: CHARGE > GUARD > ATTACK
+            if (lastMove !== 'CHARGE' && (canCCharge || cEnergy >= cChgC)) return 'CHARGE';
+            if (lastMove !== 'GUARD' && canCGuard) return 'GUARD';
+            if (lastMove !== 'ATTACK' && canCAttack) return 'ATTACK';
+
+            // それでも候補がない場合（全行動コスト不足かつCHARGEが禁止など）
+            // エネルギー不足を無視してCHARGE（またはGUARD）を強制する
+            if (lastMove !== 'CHARGE') return 'CHARGE';
+            return 'GUARD';
+        }
+    }
+
     // 選択された行動のエネルギーチェック
     let selectedMove = pool[Math.floor(Math.random() * pool.length)];
 
@@ -242,4 +311,113 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
     if (selectedMove === 'GUARD' && !canCGuard) selectedMove = 'CHARGE';
 
     return selectedMove;
+
 }
+
+export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
+    let baseCpu;
+    let aiLevel = 'EASY';
+    const isBoss = (floor > 0 && floor % 5 === 0);
+
+    if (floor === 0) {
+        baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+        aiLevel = 'EASY';
+        // Floor 0 Treasure also has Self-Destruct
+        const selfDestruct = PASSIVE_SKILLS.find(p => p.id === 'SELF_DESTRUCT');
+        if (selfDestruct) {
+            baseCpu.passive = selfDestruct;
+            baseCpu.tagline += ` [${selfDestruct.name}]`;
+        }
+        return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: false };
+    }
+
+    if (isBoss) {
+        // Draw from Boss Deck
+        const bossId = bossDeck.draw();
+        baseCpu = BOSS_CHARACTERS.find(c => c.id === bossId) || BOSS_CHARACTERS[0];
+        baseCpu = JSON.parse(JSON.stringify(baseCpu));
+
+        aiLevel = 'NORMAL';
+        baseCpu.hp += Math.floor(floor / 4);
+        baseCpu.atk += Math.floor(floor / 10);
+
+        return { cpu: baseCpu, aiLevel, isBoss: true, isTreasure: false };
+    }
+
+    if (isTreasureFloor) {
+        baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
+        aiLevel = 'EASY';
+        // Treasure Chests ALWAYS have Self-Destruct
+        const selfDestruct = PASSIVE_SKILLS.find(p => p.id === 'SELF_DESTRUCT');
+        if (selfDestruct) {
+            baseCpu.passive = selfDestruct;
+            baseCpu.tagline += ` [${selfDestruct.name}]`;
+        }
+        return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: true };
+    }
+
+    // Normal Enemy
+    const mobId = mobDeck.draw();
+    baseCpu = CHARACTERS.find(c => c.id === mobId) || CHARACTERS[0];
+    baseCpu = JSON.parse(JSON.stringify(baseCpu));
+
+    // Scaling
+    let traitCount = 0;
+
+    if (floor <= 4) { traitCount = 0; aiLevel = 'EASY'; }
+    else if (floor <= 9) { traitCount = 1; aiLevel = 'NORMAL'; }
+    else if (floor <= 14) { traitCount = 1; aiLevel = 'NORMAL'; }
+    else if (floor <= 19) { traitCount = Math.floor(Math.random() * 2) + 1; aiLevel = 'HARD'; }
+    else if (floor <= 24) { traitCount = 2; aiLevel = 'HARD'; }
+    else { traitCount = Math.floor(Math.random() * 2) + 2; aiLevel = 'EXPERT'; }
+
+    // Apply Traits
+    for (let i = 0; i < traitCount; i++) {
+        const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
+        baseCpu.name = trait.name + baseCpu.name;
+        baseCpu.hp = Math.max(1, baseCpu.hp + (trait.hp || 0));
+        baseCpu.atk = Math.max(1, baseCpu.atk + (trait.atk || 0));
+        baseCpu.chgE = Math.max(1, baseCpu.chgE + (trait.chgE || 0));
+        baseCpu.winE = Math.max(3, baseCpu.winE + (trait.winE || 0));
+        baseCpu.grdC = Math.max(0, baseCpu.grdC + (trait.grdC || 0));
+        baseCpu.atkC = Math.max(0, baseCpu.atkC + (trait.atkC || 0));
+        baseCpu.startE = Math.max(0, baseCpu.startE + (trait.startE || 0));
+        if (i === 0) baseCpu.tagline = trait.tagline;
+    }
+
+    // Floor HP Scaling
+    const floorBoost = Math.floor(floor / 5);
+    baseCpu.hp += floorBoost;
+    if (floor <= 2) baseCpu.hp = 1;
+
+    // Passives
+    let passiveType = 'NONE';
+    if (floor >= 6 && floor <= 9) passiveType = 'SELF';
+    else if (floor >= 11 && floor <= 14) passiveType = 'DEBUFF';
+    else if (floor >= 16) passiveType = 'ANY';
+
+    if (passiveType !== 'NONE') {
+        const selfBuffIds = ['FIRST_STRIKE', 'IRON_CLAD', 'WAR_CRY', 'FOCUS', 'VITALITY'];
+        const debuffIds = ['LIFE_CUT', 'SLUGGISH', 'LONG_ROAD', 'SILENCE', 'HEAVY_WEIGHT', 'LEAK'];
+
+        let pool = [];
+        if (passiveType === 'SELF') pool = PASSIVE_SKILLS.filter(p => selfBuffIds.includes(p.id));
+        else if (passiveType === 'DEBUFF') pool = PASSIVE_SKILLS.filter(p => debuffIds.includes(p.id));
+        else pool = PASSIVE_SKILLS;
+
+        if (pool.length > 0) {
+            const passive = pool[Math.floor(Math.random() * pool.length)];
+            // Note: In logic we can't 'apply' easily if it mutates 'gameState.player' directly.
+            // But 'apply' function takes (cpu, player).
+            // Here we are generating 'cpu'. 'apply' usually happens at Start of Battle.
+            // We should attach the passive definition to the CPU object, and let the game engine execute it later.
+            // Or execute it here IF we have the player object? 
+            // Better: Just attach the passive object, and let setupBattleState call .apply().
+            baseCpu.passive = passive;
+            baseCpu.tagline += ` [${passive.name}]`;
+        }
+    }
+
+    return { cpu: baseCpu, aiLevel, isBoss: false, isTreasure: false };
+}
+
