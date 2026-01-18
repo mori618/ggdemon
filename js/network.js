@@ -127,7 +127,7 @@ export class NetworkManager {
 
     generateRandomId() {
         const chars = 'abcdefghjkmnpqrstuvwxyz23456789'; // Remove confusing chars like l, 1, i, o, 0
-        let result = 'gg-';
+        let result = '';
         for (let i = 0; i < 4; i++) {
             result += chars.charAt(Math.floor(Math.random() * chars.length));
         }
