@@ -178,6 +178,19 @@ export const ITEM_EFFECTS = {
     ]
 };
 
+export const RISK_MAPPING = {
+    'ATK_UP': ['HP_DOWN', 'ATKC_UP', 'CHGE_DOWN', 'SKILL_EFFECT_DOWN'],
+    'HP_UP': ['ATK_DOWN', 'CHGE_DOWN', 'START_E_DOWN', 'WINE_UP', 'SKILL_COST_UP'],
+    'CHGE_UP': ['HP_DOWN', 'WINE_UP', 'GRDC_UP', 'ATKC_UP', 'SKILL_COST_UP'],
+    'WINE_DOWN': ['HP_DOWN', 'CHGE_DOWN', 'START_E_DOWN', 'SKILL_EFFECT_DOWN', 'GRDC_UP'],
+    'GRDC_DOWN': ['CHGE_DOWN', 'WINE_UP', 'SKILL_COST_UP', 'START_E_DOWN'],
+    'ATKC_DOWN': ['HP_DOWN', 'CHGE_DOWN', 'START_E_DOWN', 'SKILL_EFFECT_DOWN', 'ATK_DOWN'],
+    'START_E_UP': ['WINE_UP', 'CHGE_DOWN', 'ATKC_UP', 'SKILL_EFFECT_DOWN', 'SKILL_COST_UP'],
+    'SKILL_EFFECT_UP': ['SKILL_COST_UP', 'HP_DOWN', 'ATK_DOWN', 'WINE_UP', 'START_E_DOWN'],
+    'SKILL_COST_DOWN': ['HP_DOWN', 'START_E_DOWN', 'ATKC_UP', 'GRDC_UP', 'SKILL_EFFECT_DOWN'],
+    'CHARGE_COST_DOWN': ['CHGE_DOWN', 'WINE_UP', 'START_E_DOWN', 'SKILL_COST_UP']
+};
+
 export const EFFECT_ICONS = {
     'ATK_UP': { icon: 'sword', color: 'text-rose-400' },
     'GRDC_UP': { icon: 'shield', color: 'text-sky-400' },

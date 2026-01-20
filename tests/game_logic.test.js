@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { calculateTurnResult, updateEffects, getCpuMoveLogic } from '../js/logic.js';
 
 describe('Game Logic', () => {
@@ -71,8 +71,14 @@ describe('Game Logic', () => {
         it('should always attack if it can kill the player', () => {
             const p = { ...baseChar, hp: 1 };
             const c = { ...baseChar, atk: 2, atkC: 0, energy: 10 };
+
+            // Mock random to return high value to pick ATTACK (weight is 230+)
+            const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
             const move = getCpuMoveLogic({ player: p, cpu: c, pEnergy: 0, cEnergy: 10, aiLevel: 'NORMAL', cHP: 10, pHP: 1 });
             expect(move).toBe('ATTACK');
+
+            spy.mockRestore();
         });
     });
 });

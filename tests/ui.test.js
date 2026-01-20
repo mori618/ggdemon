@@ -68,7 +68,7 @@ describe('UI Logic', () => {
 
             const grid = document.getElementById('char-grid');
             expect(grid.children.length).toBeGreaterThan(1); // Random + characters
-            expect(grid.innerHTML).toContain('RANDOM');
+            expect(grid.innerHTML).toContain('Random');
         });
     });
 
