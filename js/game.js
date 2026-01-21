@@ -1,4 +1,4 @@
-import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS, RISK_MAPPING, BOSS_ICONS } from './constants.js';
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS, RISK_MAPPING } from './constants.js';
 import { gameState, saveHighStreak } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
@@ -436,51 +436,62 @@ function showFinal(cpuEWin) {
     desc.innerText = d;
     tit.className = `text-5xl font-black italic font-orbitron mb-2 uppercase tracking-tighter drop-shadow-lg z-10 ${res === 'VICTORY' ? 'text-emerald-400' : res === 'DEFEAT' ? 'text-rose-500' : 'text-white'}`;
 
-    nextB.classList.add('hidden');
-    retryB.classList.add('hidden');
-    streakB.classList.add('hidden'); // Legacy container
+    nextB?.classList.add('hidden');
+    retryB?.classList.add('hidden');
+    streakB?.classList.add('hidden'); // Legacy container
 
     // Tower Mode Result Logic
     const towerStats = document.getElementById('tower-result-stats');
     if (gameState.gameMode === 'tower') {
         if (res === 'VICTORY') {
             handleTowerVictory();
+            return; // 勝利時はresult-overlayを表示しない
         } else {
             // DEFEAT logic for Tower Mode
-            towerStats.classList.remove('hidden');
-            towerStats.style.display = 'flex'; // Ensure flex layout
+            towerStats?.classList.remove('hidden');
+            if (towerStats) towerStats.style.display = 'flex'; // Ensure flex layout
 
             document.getElementById('final-floor-val').innerText = gameState.floor;
             document.getElementById('final-kills-val').innerText = gameState.enemiesDefeated || 0;
 
             // Boss List
             const bossList = document.getElementById('final-boss-list');
-            bossList.innerHTML = '';
-            (gameState.defeatedBosses || []).forEach(bossIcon => {
-                const i = document.createElement('i');
-                i.setAttribute('data-lucide', bossIcon);
-                i.className = 'w-6 h-6 text-amber-400 drop-shadow-md';
-                bossList.appendChild(i);
-            });
+            if (bossList) {
+                bossList.innerHTML = '';
+                (gameState.defeatedBosses || []).forEach(bossIcon => {
+                    const i = document.createElement('i');
+                    i.setAttribute('data-lucide', bossIcon);
+                    i.className = 'w-6 h-6 text-amber-400 drop-shadow-md';
+                    bossList.appendChild(i);
+                });
+            }
 
             // Status
             const p = gameState.pChar;
-            document.getElementById('res-hp').innerText = p.hp;
-            document.getElementById('res-atk').innerText = p.atk;
-            document.getElementById('res-chg').innerText = p.chgE;
-            document.getElementById('res-eng').innerText = p.startE;
+            const hpEl = document.getElementById('res-hp');
+            const atkEl = document.getElementById('res-atk');
+            const chgEl = document.getElementById('res-chg');
+            const engEl = document.getElementById('res-eng');
+            if (hpEl) hpEl.innerText = p.hp;
+            if (atkEl) atkEl.innerText = p.atk;
+            if (chgEl) chgEl.innerText = p.chgE;
+            if (engEl) engEl.innerText = p.startE;
 
             // Skill
             const s = gameState.playerSkill;
             if (s) {
-                document.getElementById('res-skill-name').innerText = s.name;
-                document.getElementById('res-skill-cost').innerText = `COST: ${s.cost}`;
+                const skillNameEl = document.getElementById('res-skill-name');
+                const skillCostEl = document.getElementById('res-skill-cost');
+                if (skillNameEl) skillNameEl.innerText = s.name;
+                if (skillCostEl) skillCostEl.innerText = `COST: ${s.cost}`;
             } else {
-                document.getElementById('res-skill-name').innerText = "None";
-                document.getElementById('res-skill-cost').innerText = "";
+                const skillNameEl = document.getElementById('res-skill-name');
+                const skillCostEl = document.getElementById('res-skill-cost');
+                if (skillNameEl) skillNameEl.innerText = "None";
+                if (skillCostEl) skillCostEl.innerText = "";
             }
 
-            retryB.classList.remove('hidden');
+            if (retryB) retryB.classList.remove('hidden');
 
             // Update high score
             if (gameState.floor > gameState.highStreak) {
@@ -490,7 +501,7 @@ function showFinal(cpuEWin) {
         }
     } else {
         // Normal Mode
-        towerStats.classList.add('hidden');
+        if (towerStats) towerStats.classList.add('hidden');
     }
 
     lucide.createIcons();
