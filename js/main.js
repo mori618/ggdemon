@@ -154,6 +154,27 @@ window.restartApp = () => {
     gameState.isPaused = false;
 };
 
+window.retryTower = () => {
+    sound.playSE('click');
+    // Reset game state for Tower Mode retry
+    gameState.gameOver = false;
+    gameState.floor = 0;
+    gameState.enemiesDefeated = 0;
+    gameState.defeatedBosses = [];
+    gameState.playerSkill = null;
+    gameState.winsSinceChest = 0;
+
+    // Hide overlays
+    document.getElementById('result-overlay').classList.add('hidden');
+    document.getElementById('result-overlay').classList.remove('opacity-100');
+    document.getElementById('tower-result-stats').classList.add('hidden');
+
+    // Navigate to character selection (keeping tower mode)
+    document.getElementById('game-container').classList.add('hidden');
+    document.getElementById('char-select').classList.remove('hidden');
+    gameState.selectionState = 'PLAYER';
+};
+
 window.openStatusOverlay = (side) => {
     sound.playSE('click');
     const char = (side === 'PLAYER') ? gameState.player : gameState.cpu;
@@ -249,8 +270,43 @@ window.confirmCommand = () => {
     setTimeout(() => executeTurn(gameState.selectedCmd, getCpuMove()), 300);
 };
 
-function handleCharSelect(id) {
+window.backToTitle = () => {
     sound.playSE('click');
+    document.getElementById('select-screen').classList.add('hidden');
+    document.getElementById('title-screen').classList.remove('hidden');
+    gameState.selectionState = 'PLAYER';
+};
+
+window.confirmCharChoice = (id) => {
+    const char = (id === 'RANDOM') ? { name: 'RANDOM SELECT' } : CHARACTERS.find(c => c.id === id);
+    const overlay = document.getElementById('confirm-overlay');
+    const msg = document.getElementById('confirm-dialog-message');
+    const okBtn = document.getElementById('confirm-ok-btn');
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
+
+    msg.innerText = `${char.name} にしますか？`;
+    overlay.classList.remove('hidden');
+    setTimeout(() => overlay.classList.add('opacity-100'), 10);
+
+    okBtn.onclick = () => {
+        sound.playSE('click');
+        overlay.classList.remove('opacity-100');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+        executeCharSelect(id);
+    };
+
+    cancelBtn.onclick = () => {
+        sound.playSE('click');
+        overlay.classList.remove('opacity-100');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+    };
+};
+
+function handleCharSelect(id) {
+    confirmCharChoice(id);
+}
+
+function executeCharSelect(id) {
     let selected = (id === 'RANDOM') ? CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)] : CHARACTERS.find(c => c.id === id);
 
     // Online Config Handling
@@ -272,7 +328,9 @@ function handleCharSelect(id) {
     if (gameState.selectionState === 'PLAYER') {
         gameState.pChar = JSON.parse(JSON.stringify(selected));
         if (gameState.gameMode === GAME_MODES.TOWER) {
-            startTower();
+            // タワーモードの場合は難易度選択を表示
+            document.getElementById('select-screen').classList.add('hidden');
+            document.getElementById('tower-difficulty-screen').classList.remove('hidden');
         } else {
             gameState.selectionState = 'CPU';
             document.getElementById('select-title').innerText = "Pick CPU Hero";
@@ -284,6 +342,18 @@ function handleCharSelect(id) {
         startGame();
     }
 }
+
+window.selectTowerDifficulty = (diff) => {
+    sound.playSE('click');
+    document.getElementById('tower-difficulty-screen').classList.add('hidden');
+    startTower(diff);
+};
+
+window.cancelDifficultySelection = () => {
+    sound.playSE('click');
+    document.getElementById('tower-difficulty-screen').classList.add('hidden');
+    document.getElementById('select-screen').classList.remove('hidden');
+};
 
 function checkOnlineStart() {
     if (gameState.pSelected && gameState.cSelected) {
@@ -328,8 +398,15 @@ network.setOnData((data) => {
     }
 });
 
-function startTower() {
+function startTower(diff = 'NORMAL') {
     gameState.floor = 0;
+    gameState.towerDifficulty = diff;
+
+    // 難易度に応じた残機設定
+    if (diff === 'EASY') gameState.lives = 3;
+    else if (diff === 'HARD') gameState.lives = 1;
+    else gameState.lives = 2; // NORMAL
+
     gameState.winStreak = 0;
     gameState.winsSinceChest = 0;
     gameState.playerSkill = null;

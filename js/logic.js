@@ -314,7 +314,7 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
 
 }
 
-export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
+export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor, difficulty = 'NORMAL') {
     let baseCpu;
     let aiLevel = 'EASY';
     const isBoss = (floor > 0 && floor % 5 === 0);
@@ -337,9 +337,16 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
         baseCpu = BOSS_CHARACTERS.find(c => c.id === bossId) || BOSS_CHARACTERS[0];
         baseCpu = JSON.parse(JSON.stringify(baseCpu));
 
-        aiLevel = 'NORMAL';
-        baseCpu.hp += Math.floor(floor / 4);
-        baseCpu.atk += Math.floor(floor / 10);
+        aiLevel = (difficulty === 'HARD') ? 'HARD' : (difficulty === 'EASY' ? 'EASY' : 'NORMAL');
+
+        let hpBoost = Math.floor(floor / 4);
+        let atkBoost = Math.floor(floor / 10);
+
+        if (difficulty === 'HARD') { hpBoost += 2; atkBoost += 1; }
+        if (difficulty === 'EASY') { hpBoost = Math.max(1, hpBoost - 2); }
+
+        baseCpu.hp += hpBoost;
+        baseCpu.atk += atkBoost;
 
         return { cpu: baseCpu, aiLevel, isBoss: true, isTreasure: false };
     }
@@ -371,6 +378,19 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
     else if (floor <= 24) { traitCount = 2; aiLevel = 'HARD'; }
     else { traitCount = Math.floor(Math.random() * 2) + 2; aiLevel = 'EXPERT'; }
 
+    // Difficulty adjustments to traits and AI
+    if (difficulty === 'HARD') {
+        traitCount += 1;
+        if (aiLevel === 'EASY') aiLevel = 'NORMAL';
+        else if (aiLevel === 'NORMAL') aiLevel = 'HARD';
+        else if (aiLevel === 'HARD') aiLevel = 'EXPERT';
+    } else if (difficulty === 'EASY') {
+        traitCount = Math.max(0, traitCount - 1);
+        if (aiLevel === 'EXPERT') aiLevel = 'HARD';
+        else if (aiLevel === 'HARD') aiLevel = 'NORMAL';
+        else if (aiLevel === 'NORMAL') aiLevel = 'EASY';
+    }
+
     // Apply Traits
     for (let i = 0; i < traitCount; i++) {
         const trait = ENEMY_TRAITS[Math.floor(Math.random() * ENEMY_TRAITS.length)];
@@ -386,15 +406,20 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
     }
 
     // Floor HP Scaling
-    const floorBoost = Math.floor(floor / 5);
+    let floorBoost = Math.floor(floor / 5);
+    if (difficulty === 'HARD') floorBoost += 2;
+    if (difficulty === 'EASY') floorBoost = Math.max(0, floorBoost - 1);
+
     baseCpu.hp += floorBoost;
-    if (floor <= 2) baseCpu.hp = 1;
+    if (floor <= 2 && difficulty === 'EASY') baseCpu.hp = 1;
 
     // Passives
     let passiveType = 'NONE';
     if (floor >= 6 && floor <= 9) passiveType = 'SELF';
     else if (floor >= 11 && floor <= 14) passiveType = 'DEBUFF';
     else if (floor >= 16) passiveType = 'ANY';
+
+    if (difficulty === 'HARD' && floor >= 4) passiveType = 'ANY';
 
     if (passiveType !== 'NONE') {
         const selfBuffIds = ['FIRST_STRIKE', 'IRON_CLAD', 'WAR_CRY', 'FOCUS', 'VITALITY'];
@@ -407,12 +432,6 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor) {
 
         if (pool.length > 0) {
             const passive = pool[Math.floor(Math.random() * pool.length)];
-            // Note: In logic we can't 'apply' easily if it mutates 'gameState.player' directly.
-            // But 'apply' function takes (cpu, player).
-            // Here we are generating 'cpu'. 'apply' usually happens at Start of Battle.
-            // We should attach the passive definition to the CPU object, and let the game engine execute it later.
-            // Or execute it here IF we have the player object? 
-            // Better: Just attach the passive object, and let setupBattleState call .apply().
             baseCpu.passive = passive;
             baseCpu.tagline += ` [${passive.name}]`;
         }

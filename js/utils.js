@@ -22,8 +22,12 @@ export const gameState = {
     playerSkill: null,
     playerHistory: [],
     treasureFloorOffset: 0, // Offset within a 5-floor cycle (0-4, but Floor 5/10 are bosses)
+    lives: 0,
     mobDeck: null,
-    bossDeck: null
+    bossDeck: null,
+    // Tracking stats
+    enemiesDefeated: 0,
+    defeatedBosses: []
 };
 
 export class Deck {

@@ -1,4 +1,4 @@
-import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS } from './constants.js';
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS, RISK_MAPPING } from './constants.js';
 import { gameState, saveHighStreak } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
@@ -23,7 +23,8 @@ export function setupBattleState() {
 
         const isTreasure = (!isBoss && gameState.floor > 0 && cyclePos === gameState.treasureFloorOffset);
 
-        const result = generateTowerEnemy(gameState.floor, gameState.mobDeck, gameState.bossDeck, isTreasure);
+        const difficulty = gameState.towerDifficulty || 'NORMAL';
+        const result = generateTowerEnemy(gameState.floor, gameState.mobDeck, gameState.bossDeck, isTreasure, difficulty);
         baseCpu = result.cpu;
         gameState.aiLevel = result.aiLevel;
 
@@ -94,7 +95,11 @@ export function setupBattleState() {
 
     document.getElementById('player-name-label').innerText = gameState.player.name;
     document.getElementById('cpu-name-label').innerText = gameState.cpu.name;
-    document.getElementById('player-icon-container').innerHTML = `<i data-lucide="${gameState.player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+    let playerIconHtml = `<i data-lucide="${gameState.player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+    if (gameState.gameMode === 'tower') {
+        playerIconHtml += `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
+    }
+    document.getElementById('player-icon-container').innerHTML = playerIconHtml;
     document.getElementById('cpu-icon-container').innerHTML = `<i data-lucide="${gameState.cpu.icon}" class="w-16 h-16 md:w-20 md:h-20 ${isBoss ? 'text-purple-500' : 'text-rose-500/50'}"></i>`;
 
     initEnergy();
@@ -361,7 +366,30 @@ export function executeTurn(pM, cM) {
 
         setTimeout(() => {
             pC.classList.remove('shake'); cC.classList.remove('shake');
+
+            // Revival Logic for Tower Mode
+            if (gameState.pHP <= 0 && gameState.gameMode === 'tower' && gameState.lives > 0) {
+                gameState.lives--;
+                gameState.pHP = gameState.player.hp; // Recover to Max
+                gameState.player.hp = gameState.pHP;
+                sound.playSE('charge'); // Revival sound
+
+                // Visual feedback
+                setMessage(`REVIVED! (LIVES: ${gameState.lives})`);
+                pC.classList.add('animate-pulse'); // Visual effect
+                setTimeout(() => pC.classList.remove('animate-pulse'), 1000);
+
+                // Update specific UI elements immediately
+                const playerIconHtml = `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
+                const iconContainer = document.getElementById('player-icon-container');
+                if (iconContainer.querySelector('.absolute')) {
+                    iconContainer.querySelector('.absolute').innerText = gameState.lives;
+                }
+                updateUI();
+            }
+
             const cWinF = (gameState.cEnergy >= gameState.cpu.winE);
+            // Check Game Over (pHP is now checked after potential revival)
             if (gameState.pHP <= 0 || gameState.cHP <= 0 || gameState.pEnergy >= gameState.player.winE || cWinF) {
                 // 戦闘終了時にダイアログを確実に非表示
                 dialogOverlay.classList.add('opacity-0');
@@ -377,7 +405,9 @@ export function executeTurn(pM, cM) {
                 document.getElementById('command-wrapper').classList.remove('ui-hidden');
 
                 updateUI();
-                setMessage("Command Select");
+                if (gameState.turn > 1 && !document.getElementById('game-message').innerText.includes('REVIVED')) {
+                    setMessage("Command Select");
+                }
             }
         }, 500);
     }, 800);
@@ -390,30 +420,93 @@ function showFinal(cpuEWin) {
     const dialogOverlay = document.getElementById('battle-dialog-overlay');
     dialogOverlay.classList.add('opacity-0', 'hidden');
 
-    const ov = document.getElementById('result-overlay'), tit = document.getElementById('result-title'), desc = document.getElementById('result-desc'), nextB = document.getElementById('btn-next-stage'), streakB = document.getElementById('streak-result-box');
+    const ov = document.getElementById('result-overlay'), tit = document.getElementById('result-title'), desc = document.getElementById('result-desc');
+    const nextB = document.getElementById('btn-next-stage');
+    const retryB = document.getElementById('btn-retry-tower');
+    const streakB = document.getElementById('streak-result-box'); // Old simplistic one, keep hidden if tower mode new UI is used
+
     let res = "DRAW", d = "SIMULTANEOUS";
     if (gameState.pHP <= 0 && gameState.cHP <= 0) { res = "DRAW"; d = "DOUBLE K.O."; }
     else if (gameState.cHP <= 0) { res = "VICTORY"; d = "ENEMY DESTROYED"; sound.playSE('victory'); }
     else if (gameState.pHP <= 0) { res = "DEFEAT"; d = "HP EXHAUSTED"; sound.playSE('defeat'); }
     else if (gameState.pEnergy >= gameState.player.winE) { res = "VICTORY"; d = "CHARGED UP"; sound.playSE('victory'); }
     else if (cpuEWin) { res = "DEFEAT"; d = "CPU CHARGED UP"; sound.playSE('defeat'); }
-    tit.innerText = res; desc.innerText = d; tit.className = `text-5xl font-black italic font-orbitron mb-4 ${res === 'VICTORY' ? 'text-emerald-400' : res === 'DEFEAT' ? 'text-rose-500' : 'text-white'}`;
 
-    nextB.classList.add('hidden'); streakB.classList.add('hidden');
+    tit.innerText = res;
+    desc.innerText = d;
+    tit.className = `text-5xl font-black italic font-orbitron mb-2 uppercase tracking-tighter drop-shadow-lg z-10 ${res === 'VICTORY' ? 'text-emerald-400' : res === 'DEFEAT' ? 'text-rose-500' : 'text-white'}`;
 
-    if (res === 'VICTORY' && gameState.gameMode === 'tower') {
-        handleTowerVictory();
-    } else if (gameState.gameMode === 'tower') {
-        streakB.classList.remove('hidden');
-        document.getElementById('final-streak-val').innerText = gameState.floor;
-        if (gameState.floor > gameState.highStreak) {
-            gameState.highStreak = gameState.floor;
-            saveHighStreak(gameState.highStreak);
+    nextB?.classList.add('hidden');
+    retryB?.classList.add('hidden');
+    streakB?.classList.add('hidden'); // Legacy container
+
+    // Tower Mode Result Logic
+    const towerStats = document.getElementById('tower-result-stats');
+    if (gameState.gameMode === 'tower') {
+        if (res === 'VICTORY') {
+            handleTowerVictory();
+            return; // 勝利時はresult-overlayを表示しない
+        } else {
+            // DEFEAT logic for Tower Mode
+            towerStats?.classList.remove('hidden');
+            if (towerStats) towerStats.style.display = 'flex'; // Ensure flex layout
+
+            document.getElementById('final-floor-val').innerText = gameState.floor;
+            document.getElementById('final-kills-val').innerText = gameState.enemiesDefeated || 0;
+
+            // Boss List
+            const bossList = document.getElementById('final-boss-list');
+            if (bossList) {
+                bossList.innerHTML = '';
+                (gameState.defeatedBosses || []).forEach(bossIcon => {
+                    const i = document.createElement('i');
+                    i.setAttribute('data-lucide', bossIcon);
+                    i.className = 'w-6 h-6 text-amber-400 drop-shadow-md';
+                    bossList.appendChild(i);
+                });
+            }
+
+            // Status
+            const p = gameState.pChar;
+            const hpEl = document.getElementById('res-hp');
+            const atkEl = document.getElementById('res-atk');
+            const chgEl = document.getElementById('res-chg');
+            const engEl = document.getElementById('res-eng');
+            if (hpEl) hpEl.innerText = p.hp;
+            if (atkEl) atkEl.innerText = p.atk;
+            if (chgEl) chgEl.innerText = p.chgE;
+            if (engEl) engEl.innerText = p.startE;
+
+            // Skill
+            const s = gameState.playerSkill;
+            if (s) {
+                const skillNameEl = document.getElementById('res-skill-name');
+                const skillCostEl = document.getElementById('res-skill-cost');
+                if (skillNameEl) skillNameEl.innerText = s.name;
+                if (skillCostEl) skillCostEl.innerText = `COST: ${s.cost}`;
+            } else {
+                const skillNameEl = document.getElementById('res-skill-name');
+                const skillCostEl = document.getElementById('res-skill-cost');
+                if (skillNameEl) skillNameEl.innerText = "None";
+                if (skillCostEl) skillCostEl.innerText = "";
+            }
+
+            if (retryB) retryB.classList.remove('hidden');
+
+            // Update high score
+            if (gameState.floor > gameState.highStreak) {
+                gameState.highStreak = gameState.floor;
+                saveHighStreak(gameState.highStreak);
+            }
         }
-        ov.classList.remove('hidden'); setTimeout(() => ov.classList.add('opacity-100'), 10);
     } else {
-        ov.classList.remove('hidden'); setTimeout(() => ov.classList.add('opacity-100'), 10);
+        // Normal Mode
+        if (towerStats) towerStats.classList.add('hidden');
     }
+
+    lucide.createIcons();
+    ov.classList.remove('hidden');
+    setTimeout(() => ov.classList.add('opacity-100'), 10);
 }
 
 function handleTowerVictory() {
@@ -453,24 +546,35 @@ function showFloorClearAnim(callback) {
     }, 2200);
 }
 
-function showTreasure() {
+export function showTreasure(forceSkillPhase = false) {
     const treasureOverlay = document.getElementById('treasure-overlay');
     const cardsContainer = document.getElementById('treasure-cards-container');
     const isMimic = (gameState.cpu.id === 'TREASURE_CHEST');
     const isBoss = (gameState.floor % 5 === 0);
-    const options = generateTreasureOptions(isMimic, isBoss);
+    const options = generateTreasureOptions(isMimic, isBoss, forceSkillPhase);
     cardsContainer.innerHTML = '';
+
+    const titleEl = treasureOverlay.querySelector('h2');
+    const descEl = treasureOverlay.querySelector('p');
+
+    if (forceSkillPhase) {
+        titleEl.innerText = "Ultimate Skill Unlocked";
+        descEl.innerText = "BOSS REWARD: CHOOSE A HIGH-RANK SKILL";
+    } else {
+        titleEl.innerText = "Choose Your Reward";
+        descEl.innerText = "Select one of three options";
+    }
 
     options.forEach(option => {
         const card = document.createElement('div');
-        card.className = 'w-full max-w-md mx-auto bg-slate-900 border-4 border-slate-700 p-6 rounded-2xl shadow-lg cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all flex flex-row items-center gap-4';
         let title, description, icon, borderColor = 'border-slate-600', textColor = 'text-white', iconColor = 'text-amber-400';
         if (option.type === 'skill') {
-            title = `新スキル: ${option.skill.name}`;
-            description = `${option.skill.description} (コスト: ${option.skill.cost})`;
+            const skill = option.skill;
+            title = `新スキル: ${skill.name}`;
+            description = `${skill.description} (コスト: ${skill.cost})`;
             icon = 'star';
 
-            switch (option.skill.rarity) {
+            switch (skill.rarity) {
                 case 'COMMON':
                     borderColor = 'border-slate-500';
                     textColor = 'text-slate-300';
@@ -492,29 +596,21 @@ function showTreasure() {
                     borderColor = 'border-amber-500';
                     textColor = 'text-amber-300';
                     iconColor = 'text-amber-400';
-                    title += ' <span class="text-[10px] bg-amber-900/50 text-amber-300 px-1 rounded border border-amber-500/50 align-middle">LEGENDARY</span>';
-                    break;
-                default:
-                    // default to rare look if undefined
-                    borderColor = 'border-slate-600';
+                    title += ' <span class="text-[10px] bg-amber-900/50 text-amber-300 px-1 rounded border border-amber-500/50 align-align-middle">LEGENDARY</span>';
                     break;
             }
 
         } else {
             title = '強化アイテム';
-            const meritValue = option.merit.valueRange[0] + Math.floor(Math.random() * (option.merit.valueRange[1] - option.merit.valueRange[0] + 1));
-            option.merit.value = meritValue;
-            option.merit.value = meritValue;
 
             if (option.demerit) {
-                const demeritValue = option.demerit.valueRange[0] + Math.floor(Math.random() * (option.demerit.valueRange[1] - option.demerit.valueRange[0] + 1));
-                option.demerit.value = demeritValue;
-                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', meritValue)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', demeritValue)}</span>`;
+                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', option.demerit.value)}</span>`;
             } else {
-                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', meritValue)}</span>`;
+                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span>`;
             }
             icon = 'gem';
         }
+
         card.className = `w-full max-w-md mx-auto bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-row items-center gap-4 group hover:scale-[1.02]`;
         card.innerHTML = `
             <div class="flex-shrink-0">
@@ -522,42 +618,61 @@ function showTreasure() {
             </div>
             <div class="flex-1 text-left">
                 <h3 class="font-orbitron font-bold text-lg mb-1 ${textColor}">${title}</h3>
-                <div class="text-xs text-slate-400 font-bold leading-relaxed">${description}</div>
+                <div class="text-xs text-slate-400 font-bold leading-relaxed">${option.description || description}</div>
             </div>
         `;
-        card.onclick = () => selectTreasure(option);
+        card.onclick = () => selectTreasure(option, forceSkillPhase);
         cardsContainer.appendChild(card);
     });
 
-    // Add Skip Button
-    const skipCard = document.createElement('div');
-    skipCard.className = 'w-full max-w-md mx-auto bg-slate-800 border-4 border-slate-600 p-6 rounded-2xl shadow-lg cursor-pointer hover:border-slate-400 hover:scale-[1.02] transition-all flex flex-row items-center gap-4';
-    skipCard.innerHTML = `
-        <div class="flex-shrink-0">
-            <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
-        </div>
-        <div class="flex-1 text-left">
-            <h3 class="font-orbitron font-bold text-lg mb-2 text-white">SKIP</h3>
-            <div class="text-sm text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
-        </div>
-    `;
-    skipCard.onclick = () => selectTreasure({ type: 'skip' });
-    cardsContainer.appendChild(skipCard);
+    if (!forceSkillPhase) {
+        // Add Skip Button
+        const skipCard = document.createElement('div');
+        skipCard.className = 'w-full max-w-md mx-auto bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-row items-center gap-4 group hover:scale-[1.02]';
+        skipCard.innerHTML = `
+            <div class="flex-shrink-0">
+                <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
+            </div>
+            <div class="flex-1 text-left">
+                <h3 class="font-orbitron font-bold text-lg mb-1 text-white">SKIP</h3>
+                <div class="text-xs text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
+            </div>
+        `;
+        skipCard.onclick = () => selectTreasure({ type: 'skip' }, false);
+        cardsContainer.appendChild(skipCard);
+    }
 
     lucide.createIcons();
     treasureOverlay.classList.remove('hidden');
     setTimeout(() => treasureOverlay.classList.add('opacity-100'), 10);
 }
 
-const getRarityWeights = (floor) => {
-    if (floor <= 3) return { COMMON: 90, RARE: 10, EPIC: 0, LEGENDARY: 0 };
-    if (floor <= 7) return { COMMON: 60, RARE: 35, EPIC: 5, LEGENDARY: 0 };
-    if (floor <= 14) return { COMMON: 40, RARE: 45, EPIC: 14, LEGENDARY: 1 };
-    return { COMMON: 20, RARE: 40, EPIC: 30, LEGENDARY: 10 };
+const getRarityWeights = (floor, difficulty = 'NORMAL') => {
+    let weights = { COMMON: 90, RARE: 10, EPIC: 0, LEGENDARY: 0 };
+
+    if (floor <= 3) weights = { COMMON: 90, RARE: 10, EPIC: 0, LEGENDARY: 0 };
+    else if (floor <= 7) weights = { COMMON: 60, RARE: 35, EPIC: 5, LEGENDARY: 0 };
+    else if (floor <= 14) weights = { COMMON: 40, RARE: 45, EPIC: 14, LEGENDARY: 1 };
+    else weights = { COMMON: 20, RARE: 40, EPIC: 30, LEGENDARY: 10 };
+
+    // 難易度補正
+    if (difficulty === 'HARD') {
+        weights.RARE += 5;
+        weights.EPIC += 5;
+        weights.LEGENDARY += 2;
+        weights.COMMON = Math.max(0, 100 - (weights.RARE + weights.EPIC + weights.LEGENDARY));
+    } else if (difficulty === 'EASY') {
+        weights.COMMON += 10;
+        weights.EPIC = Math.max(0, weights.EPIC - 5);
+        weights.LEGENDARY = Math.max(0, weights.LEGENDARY - 2);
+        weights.RARE = Math.max(0, 100 - (weights.COMMON + weights.EPIC + weights.LEGENDARY));
+    }
+
+    return weights;
 };
 
-const pickRarity = (floor) => {
-    const weights = getRarityWeights(floor);
+const pickRarity = (floor, difficulty = 'NORMAL') => {
+    const weights = getRarityWeights(floor, difficulty);
     const total = Object.values(weights).reduce((a, b) => a + b, 0);
     let rand = Math.floor(Math.random() * total);
     for (const [rarity, weight] of Object.entries(weights)) {
@@ -567,80 +682,164 @@ const pickRarity = (floor) => {
     return 'COMMON';
 };
 
-function generateTreasureOptions(isMimic, isBoss) {
+export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false) {
     const options = [];
+    const difficulty = gameState.towerDifficulty || 'NORMAL';
+    const getParamFromId = (id) => id.replace(/_UP$|_DOWN$/, '');
 
-    // Helper function to extract parameter name from effect ID
-    const getParamFromId = (id) => {
-        // Remove _UP or _DOWN suffix to get the base parameter
-        return id.replace(/_UP$|_DOWN$/, '');
-    };
+    // ボス撃破後の確定報酬フェーズ
+    if (forceSkillPhase) {
+        // 1 LEGENDARY + 2 EPIC 確定
+        const rarities = ['LEGENDARY', 'EPIC', 'EPIC'];
+        const exclusiveIds = ['PHANTOM_STEP', 'GRAVITY_ZONE', 'GAMBLER', 'OVERCLOCK', 'ZERO_FORM', 'MIRAGE'];
+        let hasExclusive = false;
+        // Unused but updated for reference
+        // BOSS_ICONS check
+
+        rarities.forEach((rarity, index) => {
+            let pool;
+            // 最後のスロットでまだ限定スキルが出ていなければ、強制的に限定スキルから選ぶ（もしレアリティが合えば）
+            // または、最初から限定スキルを含めるようにプールを調整
+            if (index === 0) { // LEGENDARY slot
+                pool = SKILLS.filter(s => s.rarity === rarity);
+                // レジェンダリー限定のスキルを優先的にチェック
+                const exclusivePool = pool.filter(s => exclusiveIds.includes(s.id));
+                const skill = exclusivePool.length > 0 ? exclusivePool[Math.floor(Math.random() * exclusivePool.length)] : pool[Math.floor(Math.random() * pool.length)];
+
+                let desc = skill.description;
+                skill.effectValues.forEach(v => desc = desc.replace('?', v));
+                options.push({ type: 'skill', skill: { ...skill, description: desc } });
+                if (exclusiveIds.includes(skill.id)) hasExclusive = true;
+            } else { // EPIC slots
+                pool = SKILLS.filter(s => s.rarity === rarity);
+
+                // まだ限定スキルが出ていない場合、EPICの限定スキルを一つ入れる
+                let skill;
+                if (!hasExclusive && index === 2) {
+                    const exclusivePool = pool.filter(s => exclusiveIds.includes(s.id));
+                    skill = exclusivePool.length > 0 ? exclusivePool[Math.floor(Math.random() * exclusivePool.length)] : pool[Math.floor(Math.random() * pool.length)];
+                    hasExclusive = true;
+                } else {
+                    // 他のスキルと被らないように（簡易的）
+                    skill = pool[Math.floor(Math.random() * pool.length)];
+                }
+
+                let desc = skill.description;
+                skill.effectValues.forEach(v => desc = desc.replace('?', v));
+                options.push({ type: 'skill', skill: { ...skill, description: desc } });
+                if (exclusiveIds.includes(skill.id)) hasExclusive = true;
+            }
+        });
+        return options;
+    }
 
     if (!isMimic) {
+        // Regular Treasure or Boss First Phase (Item)
         for (let i = 0; i < 3; i++) {
-            const availableMerits = ITEM_EFFECTS.MERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
-            const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
-
-            // Get the parameter affected by the selected merit
-            const meritParam = getParamFromId(merit.id);
-
-            // Filter out demerits that affect the same parameter as the merit
-            const availableDemerits = ITEM_EFFECTS.DEMERITS.filter(item => {
-                if (item.condition && !item.condition(gameState.pChar, gameState.playerSkill)) {
-                    return false;
+            // Filter: SKILL_COST_DOWN only appears if skill cost > 1
+            const availableMerits = ITEM_EFFECTS.MERITS.filter(item => {
+                if (item.id === 'SKILL_COST_DOWN') {
+                    // Condition check: effectively same as checks inside item definition but explicit here if needed
+                    // The item definition condition: (p, ps) => ps !== null && (ps.cost + (p.skillCostBonus || 0)) > 0
+                    // User request: "appear only if skill cost is NOT 1 or less" -> meaning Cost > 1?
+                    // Current cost is (base + bonus). If (base + bonus) <= 1, effectively can't reduce further to 0?
+                    // Or simply meaningful reduction.
+                    // Let's rely on the item.condition if updated, or strictly check here.
+                    // The ITEM_EFFECTS definition for SKILL_COST_DOWN says: (p, ps) => ps !== null && (ps.cost + (p.skillCostBonus || 0)) > 0
+                    // This allows reducing 1 -> 0.
+                    // User request: "cost <= 1 excluded". So we need strict > 1.
+                    const s = gameState.playerSkill;
+                    if (!s) return false;
+                    const currentCost = Math.max(0, s.cost + (gameState.pChar.skillCostBonus || 0));
+                    return currentCost > 1;
                 }
-                const demeritParam = getParamFromId(item.id);
-                return demeritParam !== meritParam; // Exclude if same parameter
+                return !item.condition || item.condition(gameState.pChar, gameState.playerSkill);
             });
 
-            // If no non-conflicting demerits available, use all available demerits
-            const demeritPool = availableDemerits.length > 0 ? availableDemerits : ITEM_EFFECTS.DEMERITS.filter(item => !item.condition || item.condition(gameState.pChar, gameState.playerSkill));
+            const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
+            const meritParam = getParamFromId(merit.id);
+
+            // Risk Mapping Logic
+            let riskCandidates = [];
+            if (RISK_MAPPING[merit.id]) {
+                // Find demerits that match the risk mapping IDs
+                riskCandidates = ITEM_EFFECTS.DEMERITS.filter(d =>
+                    RISK_MAPPING[merit.id].includes(d.id) &&
+                    (!d.condition || d.condition(gameState.pChar, gameState.playerSkill))
+                );
+            }
 
             let demerit = null;
             if (!isBoss) {
-                demerit = demeritPool[Math.floor(Math.random() * demeritPool.length)];
+                // 70% chance to pick from mapped risks if available
+                if (riskCandidates.length > 0 && Math.random() < 0.7) {
+                    demerit = riskCandidates[Math.floor(Math.random() * riskCandidates.length)];
+                } else {
+                    // Fallback to pool excluding current merit param
+                    const fallbackPool = ITEM_EFFECTS.DEMERITS.filter(item => {
+                        if (item.condition && !item.condition(gameState.pChar, gameState.playerSkill)) return false;
+                        return getParamFromId(item.id) !== meritParam;
+                    });
+                    if (fallbackPool.length > 0) {
+                        demerit = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
+                    }
+                }
             }
 
-            options.push({ type: 'item', merit, demerit });
+            // Value Randomization
+            const meritValue = merit.valueRange[0] + Math.floor(Math.random() * (merit.valueRange[1] - merit.valueRange[0] + 1));
+            // Clone merit to attach value without modifying const
+            const mObj = { ...merit, value: meritValue };
+
+            let dObj = null;
+            let displayHtml = `<span class="text-emerald-400 block">+ ${mObj.text.replace('$V', meritValue)}</span>`;
+
+            if (demerit) {
+                const demeritValue = demerit.valueRange[0] + Math.floor(Math.random() * (demerit.valueRange[1] - demerit.valueRange[0] + 1));
+                dObj = { ...demerit, value: demeritValue };
+                displayHtml += `<span class="text-rose-500 block mt-2">- ${dObj.text.replace('$V', demeritValue)}</span>`;
+            }
+
+            options.push({ type: 'item', merit: mObj, demerit: dObj, description: displayHtml });
         }
     } else {
-        // Rarity-based Skill Selection
+        // Mimic (Skill Treasure)
         for (let i = 0; i < 3; i++) {
-            const rarity = pickRarity(gameState.floor);
-            // Filter skills by rarity AND ownership (id based)
-            // Ideally we want to avoid showing the exact same skill we have, but maybe different rarity is okay?
-            // "Revamp Skill System UI" previous convo made it so we can have duplicates.
-            // But let's stick to "Unowned ID" constraint for now if possible, OR allow upgrades?
-            // User request implies "Deck building" / "Tactics".
-
-            // Let's filter by rarity first.
+            const rarity = pickRarity(gameState.floor, difficulty);
             const pool = SKILLS.filter(s => s.rarity === rarity);
             const skill = pool[Math.floor(Math.random() * pool.length)];
-
-            // Fill description with values
             let desc = skill.description;
             skill.effectValues.forEach(v => desc = desc.replace('?', v));
-
-            // We need a unique object for the option
             options.push({ type: 'skill', skill: { ...skill, description: desc } });
         }
     }
     return options;
 }
 
-function selectTreasure(reward) {
+export function selectTreasure(reward, fromForceSkillPhase = false) {
     sound.playSE('victory');
     const treasureOverlay = document.getElementById('treasure-overlay');
+    const isBoss = (gameState.floor % 5 === 0);
+
     if (reward.type === 'item') {
         reward.merit.apply(gameState.pChar, reward.merit.value);
-        if (reward.demerit) {
-            reward.demerit.apply(gameState.pChar, reward.demerit.value);
-        }
+        if (reward.demerit) reward.demerit.apply(gameState.pChar, reward.demerit.value);
     } else if (reward.type === 'skill') {
         gameState.playerSkill = reward.skill;
     }
-    // 'skip' does nothing
 
+    // ボス撃破後のアイテム選択が終わった直後の場合、スキル選択 phase へ
+    if (isBoss && reward.type !== 'skill' && reward.type !== 'skip' && !fromForceSkillPhase) {
+        treasureOverlay.classList.remove('opacity-100');
+        setTimeout(() => {
+            treasureOverlay.classList.add('hidden');
+            // スキルフェーズを開始
+            showTreasure(true);
+        }, 300);
+        return;
+    }
+
+    // 通常の遷移
     gameState.winsSinceChest = 0;
     treasureOverlay.classList.remove('opacity-100');
     setTimeout(() => {
