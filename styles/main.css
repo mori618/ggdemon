@@ -775,3 +775,94 @@ body {
         filter: brightness(1);
     }
 }
+
+/* =========================================
+   TOWER CLIMB ANIMATION
+   ========================================= */
+
+.tower-climb-bg {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #020617 100%);
+    background-size: 100% 200%;
+    animation: climb-bg 2s linear infinite;
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+}
+
+@keyframes climb-bg {
+    0% {
+        background-position: 0% 100%;
+    }
+    100% {
+        background-position: 0% 0%;
+    }
+}
+
+.tower-wall-lines {
+    position: absolute;
+    inset: 0;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: wall-scroll 1s linear infinite;
+    z-index: -1;
+}
+
+@keyframes wall-scroll {
+    0% {
+        transform: translateY(-40px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.animate-bounce-climb {
+    animation: bounce-climb 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+}
+
+@keyframes bounce-climb {
+    0%, 100% {
+        transform: translateY(0) scale(1, 1);
+    }
+    40% {
+        transform: translateY(-30px) scale(0.9, 1.1);
+    }
+    60% {
+        transform: translateY(-15px) scale(0.95, 1.05);
+    }
+    80% {
+        transform: translateY(5px) scale(1.1, 0.9);
+    }
+}
+
+.climb-overlay-enter {
+    animation: climbEnter 0.5s ease-out forwards;
+}
+
+.climb-overlay-exit {
+    animation: climbExit 0.5s ease-in forwards;
+}
+
+@keyframes climbEnter {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes climbExit {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.1);
+    }
+}

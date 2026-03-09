@@ -511,39 +511,68 @@ function showFinal(cpuEWin) {
 
 function handleTowerVictory() {
     document.getElementById('result-overlay').classList.add('hidden');
-    showFloorClearAnim(() => showTreasure());
+    // --- 変更: 以前のshowFloorClearAnimを無くし、すぐに宝箱画面へ（アニメーションは宝箱の後に行う） ---
+    showTreasure();
 }
 
-function showFloorClearAnim(callback) {
+function showTowerClimbAnim(currentFloor, nextFloor, callback) {
+    sound.playSE('charge'); // 登る際のSE（仮定）
+
     const overlay = document.createElement('div');
-    overlay.className = 'fixed inset-0 z-[300] bg-slate-950/90 flex flex-col items-center justify-center animate-fade-in';
-    const nextIsBoss = ((gameState.floor + 1) % 5 === 0);
+    overlay.className = 'fixed inset-0 z-[300] flex flex-col items-center justify-center climb-overlay-enter overflow-hidden';
+
+    const nextIsBoss = (nextFloor % 5 === 0);
     const accentColor = nextIsBoss ? 'text-rose-500' : 'text-emerald-500';
+    const playerIcon = gameState.player.icon || 'user';
 
     overlay.innerHTML = `
-        <div class="text-center">
-            <div class="font-orbitron text-slate-500 text-sm font-black tracking-[0.5em] mb-4 uppercase">Floor Cleared</div>
-            <div class="flex items-center justify-center gap-8 mb-8">
-                <div class="flex flex-col">
-                    <span class="font-orbitron text-slate-700 text-xs font-bold uppercase">Current</span>
-                    <span class="font-orbitron text-slate-500 text-5xl font-black italic">F${gameState.floor}</span>
+        <!-- 背景のスクロールアニメーション要素 -->
+        <div class="tower-climb-bg"></div>
+        <div class="tower-wall-lines"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-900/80 z-[-1]"></div>
+
+        <div class="text-center relative z-10 flex flex-col items-center">
+            <div class="font-orbitron text-slate-400 text-sm font-black tracking-[0.5em] mb-12 uppercase drop-shadow-md">
+                ${nextIsBoss ? 'Approaching Boss Floor...' : 'Ascending Tower...'}
+            </div>
+            
+            <div class="flex flex-col items-center justify-center mb-16 relative">
+                <!-- キャラクターアイコンが跳ねる -->
+                <div class="w-24 h-24 bg-slate-900 border-4 ${nextIsBoss ? 'border-rose-500/50' : 'border-sky-500/50'} rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.8)] animate-bounce-climb relative z-10">
+                    <i data-lucide="${playerIcon}" class="w-12 h-12 text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.8)]"></i>
                 </div>
-                <i data-lucide="chevrons-right" class="w-12 h-12 ${accentColor} ${nextIsBoss ? 'animate-ping' : 'animate-side-pulse'}"></i>
-                <div class="flex flex-col">
-                    <span class="${accentColor} font-orbitron text-xs font-bold uppercase">${nextIsBoss ? 'CAUTION' : 'Next'}</span>
-                    <span class="font-orbitron text-white text-7xl font-black italic ${nextIsBoss ? 'drop-shadow-[0_0_25px_rgba(244,63,94,0.7)]' : 'drop-shadow-[0_0_20px_rgba(52,211,153,0.5)]'}">F${gameState.floor + 1}</span>
+                
+                <!-- 足元の影 -->
+                <div class="w-16 h-4 bg-black/60 rounded-[100%] absolute -bottom-6 blur-sm"></div>
+            </div>
+
+            <div class="flex flex-row items-center gap-6 bg-slate-900/80 p-6 rounded-3xl border border-slate-700 backdrop-blur-sm shadow-2xl">
+                <div class="flex flex-col items-center">
+                    <span class="font-orbitron text-slate-500 text-[10px] font-bold uppercase tracking-widest">Cleared</span>
+                    <span class="font-orbitron text-slate-400 text-4xl font-black italic">F${currentFloor}</span>
+                </div>
+                <i data-lucide="chevrons-right" class="w-8 h-8 ${accentColor} animate-side-pulse drop-shadow-lg"></i>
+                <div class="flex flex-col items-center">
+                    <span class="${accentColor} font-orbitron text-[10px] font-bold uppercase tracking-widest">${nextIsBoss ? 'WARNING' : 'Next'}</span>
+                    <span class="font-orbitron text-white text-6xl font-black italic ${nextIsBoss ? 'drop-shadow-[0_0_20px_rgba(244,63,94,0.6)]' : 'drop-shadow-[0_0_15px_rgba(52,211,153,0.4)]'} transform scale-110">F${nextFloor}</span>
                 </div>
             </div>
-            <div class="font-orbitron ${accentColor} text-[10px] font-black uppercase tracking-[0.3em]">${nextIsBoss ? 'High energy reading detected ahead...' : 'Ascending to the next level...'}</div>
         </div>
     `;
+
     document.body.appendChild(overlay);
     lucide.createIcons();
 
+    // アニメーション終了処理
     setTimeout(() => {
-        overlay.style.transition = 'all 0.5s'; overlay.style.opacity = '0'; overlay.style.transform = 'scale(1.1)';
-        setTimeout(() => { document.body.removeChild(overlay); callback(); }, 500);
-    }, 2200);
+        overlay.classList.remove('climb-overlay-enter');
+        overlay.classList.add('climb-overlay-exit');
+
+        setTimeout(() => {
+            document.body.removeChild(overlay);
+            if (callback) callback();
+        }, 500); // exitアニメーション時間
+    }, 2500); // 画面表示時間
 }
 
 export function showTreasure(forceSkillPhase = false) {
@@ -842,10 +871,16 @@ export function selectTreasure(reward, fromForceSkillPhase = false) {
     // 通常の遷移
     gameState.winsSinceChest = 0;
     treasureOverlay.classList.remove('opacity-100');
+
     setTimeout(() => {
         treasureOverlay.classList.add('hidden');
-        gameState.winStreak++; gameState.floor++;
-        gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
-        setupBattleState();
+        gameState.winStreak++;
+
+        // 塔を登るアニメーションをここで再生
+        showTowerClimbAnim(gameState.floor, gameState.floor + 1, () => {
+            gameState.floor++;
+            gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+            setupBattleState();
+        });
     }, 500);
 }
