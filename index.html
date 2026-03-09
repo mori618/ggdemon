@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/peerjs@1.5.0/dist/peerjs.min.js"></script>
     
-  <script type="module" crossorigin src="/ggdemon/assets/index-82b5c82e.js"></script>
+  <script type="module" crossorigin src="/ggdemon/assets/index-c179d66d.js"></script>
   <link rel="stylesheet" href="/ggdemon/assets/index-a1582f4e.css">
 </head>
 
@@ -514,10 +514,16 @@
         <!-- Content injected by JS -->
     </div>
 
-    <!-- Treasure Chest Overlay -->
+    <!-- Treasure Chest Overlay -> Independent Screen -->
     <div id="treasure-overlay"
-        class="fixed inset-0 z-[160] overlay-bg flex-col items-center justify-start hidden opacity-0 transition-opacity duration-500 p-4 pt-12 pb-12 overflow-y-auto">
-        <div class="flex flex-col items-center text-center mb-8">
+        class="fixed inset-0 z-[160] bg-gradient-to-b from-slate-900 via-slate-950 to-black flex-col items-center justify-start hidden opacity-0 transition-opacity duration-500 p-4 pt-8 pb-12 overflow-y-auto">
+        <!-- 宝物庫の背景装飾 -->
+        <div class="absolute top-0 left-0 w-full h-64 bg-amber-500/5 blur-[100px] pointer-events-none"></div>
+
+        <!-- Player Status Bar (Injected by JS) -->
+        <div id="treasure-player-info" class="w-full max-w-2xl mb-6 relative z-10 flex justify-between items-end"></div>
+
+        <div class="flex flex-col items-center text-center mb-6 relative z-10">
             <i data-lucide="gem" class="w-16 h-16 text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.7)] mb-3"></i>
             <h2 class="text-3xl font-black italic font-orbitron uppercase tracking-tighter text-white">Choose Your
                 Reward</h2>
