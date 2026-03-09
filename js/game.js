@@ -568,6 +568,8 @@ function showTowerClimbAnim(currentFloor, nextFloor, callback) {
         overlay.classList.remove('climb-overlay-enter');
         overlay.classList.add('climb-overlay-exit');
 
+        // 塔を登るアニメーション再生開始時、裏のUIは非表示のままにする
+        // (次のバトル準備が完了するまで非表示を維持)
         setTimeout(() => {
             document.body.removeChild(overlay);
             if (callback) callback();
@@ -576,6 +578,10 @@ function showTowerClimbAnim(currentFloor, nextFloor, callback) {
 }
 
 export function showTreasure(forceSkillPhase = false) {
+    // 宝物画面表示中は裏のバトルUIを非表示にする
+    const mainUI = [document.querySelector('header'), document.querySelector('main'), document.getElementById('footer-ui-container')];
+    mainUI.forEach(el => { if (el) el.classList.add('hidden'); });
+
     const treasureOverlay = document.getElementById('treasure-overlay');
     const cardsContainer = document.getElementById('treasure-cards-container');
     const isMimic = (gameState.cpu.id === 'TREASURE_CHEST');
@@ -592,6 +598,36 @@ export function showTreasure(forceSkillPhase = false) {
     } else {
         titleEl.innerText = "Choose Your Reward";
         descEl.innerText = "Select one of three options";
+    }
+
+    // プレイヤーのステータス表示
+    const playerInfoContainer = document.getElementById('treasure-player-info');
+    if (playerInfoContainer) {
+        const pHP = gameState.pHP;
+        const maxHP = gameState.player.hp;
+        const skillName = gameState.playerSkill ? gameState.playerSkill.name : 'None';
+        const skillDesc = gameState.playerSkill ? `コスト: ${gameState.playerSkill.cost}` : '';
+        const hpColor = (pHP <= maxHP * 0.3) ? 'text-rose-500' : 'text-emerald-400';
+
+        playerInfoContainer.innerHTML = `
+            <div class="flex items-center gap-3 bg-slate-900/80 border border-slate-700 px-4 py-2 rounded-2xl backdrop-blur-sm">
+                <i data-lucide="heart" class="w-5 h-5 ${hpColor} fill-current/20"></i>
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-1">HP</span>
+                    <span class="font-orbitron font-black text-sm text-white leading-none">${pHP} <span class="text-slate-500 text-xs">/ ${maxHP}</span></span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 bg-slate-900/80 border border-slate-700 px-4 py-2 rounded-2xl backdrop-blur-sm text-right">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-1">Current Skill</span>
+                    <div class="flex items-end gap-2">
+                        <span class="text-[9px] text-slate-500 font-bold">${skillDesc}</span>
+                        <span class="font-orbitron font-bold text-sm text-sky-300 leading-none">${skillName}</span>
+                    </div>
+                </div>
+                <i data-lucide="star" class="w-5 h-5 text-sky-400"></i>
+            </div>
+        `;
     }
 
     options.forEach(option => {
@@ -633,21 +669,22 @@ export function showTreasure(forceSkillPhase = false) {
             title = '強化アイテム';
 
             if (option.demerit) {
-                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', option.demerit.value)}</span>`;
+                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span><span class="text-rose-500 block mt-1">- ${option.demerit.text.replace('$V', option.demerit.value)}</span>`;
             } else {
                 description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span>`;
             }
             icon = 'gem';
         }
 
-        card.className = `w-full max-w-md mx-auto bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-row items-center gap-4 group hover:scale-[1.02]`;
+        // カードの大きさを小さく調整 (max-w-md -> max-w-sm, p-4 -> p-3, アイコン w-12 -> w-10, h-12 -> h-10, タイトル text-lg -> text-base, 説明文 text-xs -> text-[11px])
+        card.className = `w-full max-w-sm mx-auto bg-slate-900 border-2 ${borderColor} p-3 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-row items-center gap-3 group hover:scale-[1.02]`;
         card.innerHTML = `
             <div class="flex-shrink-0">
-                <i data-lucide="${icon}" class="w-12 h-12 ${iconColor}"></i>
+                <i data-lucide="${icon}" class="w-10 h-10 ${iconColor}"></i>
             </div>
             <div class="flex-1 text-left">
-                <h3 class="font-orbitron font-bold text-lg mb-1 ${textColor}">${title}</h3>
-                <div class="text-xs text-slate-400 font-bold leading-relaxed">${option.description || description}</div>
+                <h3 class="font-orbitron font-bold text-base mb-1 ${textColor}">${title}</h3>
+                <div class="text-[11px] text-slate-400 font-bold leading-relaxed">${option.description || description}</div>
             </div>
         `;
         card.onclick = () => selectTreasure(option, forceSkillPhase);
@@ -655,16 +692,16 @@ export function showTreasure(forceSkillPhase = false) {
     });
 
     if (!forceSkillPhase) {
-        // Add Skip Button
+        // Add Skip Button (サイズ調整適用)
         const skipCard = document.createElement('div');
-        skipCard.className = 'w-full max-w-md mx-auto bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-row items-center gap-4 group hover:scale-[1.02]';
+        skipCard.className = 'w-full max-w-sm mx-auto bg-slate-800 border-2 border-slate-600 p-3 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-row items-center gap-3 group hover:scale-[1.02]';
         skipCard.innerHTML = `
             <div class="flex-shrink-0">
-                <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
+                <i data-lucide="skip-forward" class="w-10 h-10 text-slate-400"></i>
             </div>
             <div class="flex-1 text-left">
-                <h3 class="font-orbitron font-bold text-lg mb-1 text-white">SKIP</h3>
-                <div class="text-xs text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
+                <h3 class="font-orbitron font-bold text-base mb-1 text-white">SKIP</h3>
+                <div class="text-[11px] text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
             </div>
         `;
         skipCard.onclick = () => selectTreasure({ type: 'skip' }, false);
@@ -881,6 +918,10 @@ export function selectTreasure(reward, fromForceSkillPhase = false) {
             gameState.floor++;
             gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
             setupBattleState();
+
+            // アニメーションおよびセットアップ終了後、バトルUIを再表示する
+            const mainUI = [document.querySelector('header'), document.querySelector('main'), document.getElementById('footer-ui-container')];
+            mainUI.forEach(el => { if (el) el.classList.remove('hidden'); });
         });
     }, 500);
 }
