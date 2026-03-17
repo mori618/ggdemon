@@ -5,11 +5,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>G.G Demon</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/peerjs@1.5.0/dist/peerjs.min.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     
-  <script type="module" crossorigin src="/ggdemon/assets/index-4739e9e4.js"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#256af4",
+                        "background-light": "#f5f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"],
+                        "orbitron": ["Orbitron", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-panel {
+            background: rgba(37, 106, 244, 0.05);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+  <script type="module" crossorigin src="/ggdemon/assets/index-42f25ad7.js"></script>
   <link rel="stylesheet" href="/ggdemon/assets/index-a1582f4e.css">
 </head>
 
@@ -62,28 +95,126 @@
 
     <!-- Screen 1: Selection Phase -->
     <div id="select-screen"
-        class="fixed inset-0 z-[100] flex flex-col items-center justify-start p-6 bg-slate-950 hidden text-white overflow-hidden">
-        <div class="w-full max-w-xl flex justify-between items-center mt-6 mb-8">
-            <button onclick="backToTitle()"
-                class="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                <i data-lucide="arrow-left" class="w-5 h-5"></i>
-                <span class="font-black font-orbitron text-xs uppercase tracking-widest">Back</span>
+        class="fixed inset-0 z-[100] flex flex-col bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-x-hidden hidden">
+        
+        <!-- Top Navigation Bar -->
+        <header class="flex items-center justify-between p-4 bg-background-light/50 dark:bg-background-dark/50 sticky top-0 z-[110] backdrop-blur-md">
+            <button onclick="backToTitle()" class="flex items-center justify-center size-10 rounded-full hover:bg-primary/20 transition-colors">
+                <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <h2 id="select-title"
-                class="text-2xl font-black font-orbitron text-center bg-gradient-to-r from-emerald-400 via-sky-400 to-rose-400 bg-clip-text text-transparent italic tracking-tighter uppercase">
-                Select Your Hero</h2>
-            <div class="w-10"></div> <!-- Spacer for centering -->
-        </div>
-        <div id="difficulty-selector" class="hidden w-full max-w-xl flex gap-3 mb-6">
-            <button onclick="setAiLevel('EASY')" class="level-btn bg-slate-800 text-emerald-400"
-                id="lvl-EASY">EASY</button>
-            <button onclick="setAiLevel('NORMAL')" class="level-btn bg-slate-800 text-sky-400 selected"
-                id="lvl-NORMAL">NORMAL</button>
-            <button onclick="setAiLevel('HARD')" class="level-btn bg-slate-800 text-rose-400"
-                id="lvl-HARD">HARD</button>
-        </div>
-        <div class="grid grid-cols-2 gap-3 w-full max-w-xl overflow-y-auto pb-10" id="char-grid"
-            style="scrollbar-width: none;"></div>
+            <h1 class="text-xl font-bold tracking-tight uppercase">Character Select</h1>
+            <button class="flex items-center justify-center size-10 rounded-full hover:bg-primary/20 transition-colors">
+                <span class="material-symbols-outlined">settings</span>
+            </button>
+        </header>
+
+        <main class="flex flex-col flex-1 overflow-y-auto no-scrollbar">
+            <!-- Difficulty Selector (Optional/Hidden for now as in original) -->
+            <div id="difficulty-selector" class="hidden w-full max-w-xl flex gap-3 p-4 mx-auto">
+                <button onclick="setAiLevel('EASY')" class="level-btn bg-slate-800 text-emerald-400 flex-1 py-2 rounded-xl" id="lvl-EASY">EASY</button>
+                <button onclick="setAiLevel('NORMAL')" class="level-btn bg-slate-800 text-sky-400 selected flex-1 py-2 rounded-xl" id="lvl-NORMAL">NORMAL</button>
+                <button onclick="setAiLevel('HARD')" class="level-btn bg-slate-800 text-rose-400 flex-1 py-2 rounded-xl" id="lvl-HARD">HARD</button>
+            </div>
+
+            <!-- Character Carousel Area -->
+            <div class="relative flex-shrink-0 flex flex-col items-center justify-center py-6 px-4">
+                <!-- Side Navigation Arrows -->
+                <button id="carousel-prev" class="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 opacity-50 hover:opacity-100 transition-opacity">
+                    <span class="material-symbols-outlined text-4xl">chevron_left</span>
+                </button>
+                <button id="carousel-next" class="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined text-4xl">chevron_right</span>
+                </button>
+
+                <!-- Horizontal Scroll Container -->
+                <div id="char-carousel" class="flex overflow-x-auto no-scrollbar snap-x snap-mandatory w-full gap-8 px-8 items-center scroll-smooth">
+                    <!-- Cards will be injected by js/ui.js -->
+                </div>
+
+                <!-- Pagination Dots -->
+                <div id="carousel-dots" class="flex gap-2 mt-8">
+                    <!-- Dots will be injected by js/ui.js -->
+                </div>
+            </div>
+
+            <!-- Stats Section -->
+            <div id="char-stats-section" class="glass-panel mx-4 mb-32 rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-6">
+                    <span class="material-symbols-outlined text-primary text-xl">monitoring</span>
+                    <h3 class="text-lg font-bold uppercase tracking-tight">Attributes</h3>
+                </div>
+                <!-- Stats Grid -->
+                <div id="stats-grid" class="grid grid-cols-2 gap-4">
+                    <!-- HP Stat -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Health</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-hp-icons" class="flex gap-0.5"></div>
+                            <span id="stat-hp-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                    <!-- ATK Stat -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Attack</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-atk-icons" class="flex gap-0.5"></div>
+                            <span id="stat-atk-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                    <!-- WinE Stat -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">WinE</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-wine-icons" class="flex gap-0.5"></div>
+                            <span id="stat-wine-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                    <!-- ChgE Stat -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ChgE</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-chge-icons" class="flex gap-0.5"></div>
+                            <span id="stat-chge-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                    <!-- GrdC Stat -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">GrdC</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-grdc-icons" class="flex gap-0.5"></div>
+                            <span id="stat-grdc-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                    <!-- AtkC Stat -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">AtkC</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-atkc-icons" class="flex gap-0.5"></div>
+                            <span id="stat-atkc-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                    <!-- StartE Stat (Full Width) -->
+                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5 col-span-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">StartE</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-starte-icons" class="flex gap-0.5"></div>
+                            <span id="stat-starte-val" class="text-xl font-bold leading-none">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Fixed Footer Action -->
+        <footer class="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background-dark via-background-dark to-transparent z-[120]">
+            <button id="confirm-selection-btn" class="w-full h-14 bg-primary text-white font-bold text-lg uppercase tracking-[0.2em] rounded-xl shadow-[0_8px_25px_rgba(37,106,244,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                <span>Select</span>
+                <span class="material-symbols-outlined text-xl">check_circle</span>
+            </button>
+        </footer>
+
+        <!-- Background Decoration -->
+        <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent -z-10 pointer-events-none"></div>
     </div>
 
     <!-- Screen 1.5: Tower Difficulty Selection -->
