@@ -47,7 +47,7 @@
             font-variation-settings: 'FILL' 1;
         }
     </style>
-  <script type="module" crossorigin src="/ggdemon/assets/index-a1ec0295.js"></script>
+  <script type="module" crossorigin src="/ggdemon/assets/index-561a1299.js"></script>
   <link rel="stylesheet" href="/ggdemon/assets/index-a1582f4e.css">
 </head>
 
@@ -113,97 +113,186 @@
             </button>
         </header>
 
-        <main class="flex flex-col flex-1 overflow-y-auto no-scrollbar">
-            <!-- Difficulty Selector (Optional/Hidden for now as in original) -->
-            <div id="difficulty-selector" class="hidden w-full max-w-xl flex gap-3 p-4 mx-auto">
-                <button onclick="setAiLevel('EASY')" class="level-btn bg-slate-800 text-emerald-400 flex-1 py-2 rounded-xl" id="lvl-EASY">EASY</button>
-                <button onclick="setAiLevel('NORMAL')" class="level-btn bg-slate-800 text-sky-400 selected flex-1 py-2 rounded-xl" id="lvl-NORMAL">NORMAL</button>
-                <button onclick="setAiLevel('HARD')" class="level-btn bg-slate-800 text-rose-400 flex-1 py-2 rounded-xl" id="lvl-HARD">HARD</button>
+        <main class="flex-grow overflow-y-auto no-scrollbar pb-32">
+            <div class="md:hidden grid grid-cols-2 grid-rows-2 gap-3 p-4">
+                <!-- Top Left: Character Icon (Row 1, Col 1) -->
+                <div class="relative flex flex-col items-center justify-center p-2 rounded-2xl glass-panel row-span-1 col-span-1 min-h-[160px]">
+                     <!-- Side Navigation Arrows -->
+                    <button id="carousel-prev-mobile" class="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1 opacity-50">
+                        <span class="material-symbols-outlined text-2xl">chevron_left</span>
+                    </button>
+                    <button id="carousel-next-mobile" class="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-1">
+                        <span class="material-symbols-outlined text-2xl">chevron_right</span>
+                    </button>
+                    <!-- Horizontal Scroll Container -->
+                    <div id="char-carousel-mobile" class="flex overflow-x-auto no-scrollbar snap-x snap-mandatory w-full items-center scroll-smooth">
+                        <!-- Cards will be injected by js/ui.js -->
+                    </div>
+                </div>
+
+                <!-- Top Right: Basic Stats (Row 1, Col 2) -->
+                <div class="flex flex-col gap-2 p-3 rounded-2xl glass-panel row-span-1 col-span-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">monitoring</span> Basic
+                    </span>
+                    <!-- HP -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">Health</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-hp-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-hp-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                    <!-- ATK -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">Attack</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-atk-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-atk-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                    <!-- WinE -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">WinE</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-wine-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-wine-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Left: Energy (Row 2, Col 1) -->
+                <div class="flex flex-col gap-2 p-3 rounded-2xl glass-panel row-span-1 col-span-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">bolt</span> Energy
+                    </span>
+                    <!-- ChgE -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">ChgE</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-chge-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-chge-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                    <!-- StartE -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">StartE</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-starte-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-starte-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Right: Costs (Row 2, Col 2) -->
+                <div class="flex flex-col gap-2 p-3 rounded-2xl glass-panel row-span-1 col-span-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">payments</span> Costs
+                    </span>
+                    <!-- GrdC -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">GrdC</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-grdc-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-grdc-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                    <!-- AtkC -->
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-slate-500 uppercase">AtkC</span>
+                        <div class="flex items-center justify-between">
+                            <div id="stat-atkc-icons-m" class="flex gap-0.5 scale-75 origin-left"></div>
+                            <span id="stat-atkc-val-m" class="text-sm font-bold">0</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Character Carousel Area -->
-            <div class="relative flex-shrink-0 flex flex-col items-center justify-center py-2 md:py-6 px-4">
-                <!-- Side Navigation Arrows -->
-                <button id="carousel-prev" class="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 opacity-50 hover:opacity-100 transition-opacity">
-                    <span class="material-symbols-outlined text-4xl">chevron_left</span>
-                </button>
-                <button id="carousel-next" class="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 hover:text-primary transition-colors">
-                    <span class="material-symbols-outlined text-4xl">chevron_right</span>
-                </button>
+            <div class="hidden md:flex flex-col flex-1">
+                <!-- Character Carousel Area -->
+                <div class="relative flex-shrink-0 flex flex-col items-center justify-center py-6 px-4">
+                    <!-- Side Navigation Arrows -->
+                    <button id="carousel-prev" class="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 opacity-50 hover:opacity-100 transition-opacity">
+                        <span class="material-symbols-outlined text-4xl">chevron_left</span>
+                    </button>
+                    <button id="carousel-next" class="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-4xl">chevron_right</span>
+                    </button>
 
-                <!-- Horizontal Scroll Container -->
-                <div id="char-carousel" class="flex overflow-x-auto no-scrollbar snap-x snap-mandatory w-full gap-4 md:gap-8 px-8 items-center scroll-smooth">
-                    <!-- Cards will be injected by js/ui.js -->
+                    <!-- Horizontal Scroll Container -->
+                    <div id="char-carousel" class="flex overflow-x-auto no-scrollbar snap-x snap-mandatory w-full gap-8 px-8 items-center scroll-smooth">
+                        <!-- Cards will be injected by js/ui.js -->
+                    </div>
+
+                    <!-- Pagination Dots -->
+                    <div id="carousel-dots" class="flex gap-2 mt-8">
+                        <!-- Dots will be injected by js/ui.js -->
+                    </div>
                 </div>
 
-                <!-- Pagination Dots -->
-                <div id="carousel-dots" class="flex gap-2 mt-4 md:mt-8">
-                    <!-- Dots will be injected by js/ui.js -->
-                </div>
-            </div>
-
-            <!-- Stats Section -->
-            <div id="char-stats-section" class="glass-panel mx-4 mb-24 md:mb-32 rounded-2xl p-4 md:p-6">
-                <div class="flex items-center gap-2 mb-4 md:mb-6">
-                    <span class="material-symbols-outlined text-primary text-xl">monitoring</span>
-                    <h3 class="text-lg font-bold uppercase tracking-tight">Attributes</h3>
-                </div>
-                <!-- Stats Grid -->
-                <div id="stats-grid" class="grid grid-cols-2 gap-4">
-                    <!-- HP Stat -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Health</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-hp-icons" class="flex gap-0.5"></div>
-                            <span id="stat-hp-val" class="text-xl font-bold leading-none">0</span>
-                        </div>
+                <!-- Stats Section -->
+                <div id="char-stats-section" class="glass-panel mx-4 mb-32 rounded-2xl p-6">
+                    <div class="flex items-center gap-2 mb-6">
+                        <span class="material-symbols-outlined text-primary text-xl">monitoring</span>
+                        <h3 class="text-lg font-bold uppercase tracking-tight">Attributes</h3>
                     </div>
-                    <!-- ATK Stat -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Attack</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-atk-icons" class="flex gap-0.5"></div>
-                            <span id="stat-atk-val" class="text-xl font-bold leading-none">0</span>
+                    <!-- Stats Grid -->
+                    <div id="stats-grid" class="grid grid-cols-2 gap-4">
+                        <!-- HP Stat -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Health</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-hp-icons" class="flex gap-0.5"></div>
+                                <span id="stat-hp-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
                         </div>
-                    </div>
-                    <!-- WinE Stat -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">WinE</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-wine-icons" class="flex gap-0.5"></div>
-                            <span id="stat-wine-val" class="text-xl font-bold leading-none">0</span>
+                        <!-- ATK Stat -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Attack</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-atk-icons" class="flex gap-0.5"></div>
+                                <span id="stat-atk-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
                         </div>
-                    </div>
-                    <!-- ChgE Stat -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ChgE</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-chge-icons" class="flex gap-0.5"></div>
-                            <span id="stat-chge-val" class="text-xl font-bold leading-none">0</span>
+                        <!-- WinE Stat -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">WinE</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-wine-icons" class="flex gap-0.5"></div>
+                                <span id="stat-wine-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
                         </div>
-                    </div>
-                    <!-- GrdC Stat -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">GrdC</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-grdc-icons" class="flex gap-0.5"></div>
-                            <span id="stat-grdc-val" class="text-xl font-bold leading-none">0</span>
+                        <!-- ChgE Stat -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ChgE</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-chge-icons" class="flex gap-0.5"></div>
+                                <span id="stat-chge-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
                         </div>
-                    </div>
-                    <!-- AtkC Stat -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">AtkC</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-atkc-icons" class="flex gap-0.5"></div>
-                            <span id="stat-atkc-val" class="text-xl font-bold leading-none">0</span>
+                        <!-- GrdC Stat -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">GrdC</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-grdc-icons" class="flex gap-0.5"></div>
+                                <span id="stat-grdc-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
                         </div>
-                    </div>
-                    <!-- StartE Stat (Full Width) -->
-                    <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5 col-span-2">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">StartE</span>
-                        <div class="flex items-center justify-between">
-                            <div id="stat-starte-icons" class="flex gap-0.5"></div>
-                            <span id="stat-starte-val" class="text-xl font-bold leading-none">0</span>
+                        <!-- AtkC Stat -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">AtkC</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-atkc-icons" class="flex gap-0.5"></div>
+                                <span id="stat-atkc-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
+                        </div>
+                        <!-- StartE Stat (Full Width) -->
+                        <div class="flex flex-col p-3 rounded-xl bg-white/5 border border-white/5 col-span-2">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">StartE</span>
+                            <div class="flex items-center justify-between">
+                                <div id="stat-starte-icons" class="flex gap-0.5"></div>
+                                <span id="stat-starte-val" class="text-xl font-bold leading-none">0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
