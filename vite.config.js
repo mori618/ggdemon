@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-    // GitHub Pages のリポジトリ名に合わせて base を設定
-    // https://<USERNAME>.github.io/<REPO>/ の形式になるため
-    base: '/ggdemon/',
+    // Cloudflare Pages や GitHub Pages の両方で動作しやすいように相対パスに設定
+    base: './',
     build: {
         outDir: 'dist',
     },
