@@ -80,4 +80,15 @@ describe('Boss Reward Logic', () => {
             expect(gameState.floor).toBe(initialFloor);
         });
     });
+
+    describe('generateTreasureOptions for Boss - duplicate prevention', () => {
+        it('should NOT generate duplicate skills in boss reward skill phase', () => {
+            for (let i = 0; i < 100; i++) {
+                const options = generateTreasureOptions(false, true, true);
+                const skills = options.map(o => o.skill.id);
+                const uniqueSkills = new Set(skills);
+                expect(uniqueSkills.size).toBe(options.length); // 3 unique skills
+            }
+        });
+    });
 });

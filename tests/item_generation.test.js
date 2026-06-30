@@ -115,4 +115,22 @@ describe('Item Generation Logic', () => {
         expect(gameState.enemiesDefeated).toBe(5);
         expect(gameState.defeatedBosses).toContain('skull');
     });
+
+    it('should NOT generate duplicate merits in a single regular treasure chest', () => {
+        for (let i = 0; i < 100; i++) {
+            const options = generateTreasureOptions(false, false, false);
+            const merits = options.map(o => o.merit.id);
+            const uniqueMerits = new Set(merits);
+            expect(uniqueMerits.size).toBe(options.length); // 3 items, should be 3 unique merits
+        }
+    });
+
+    it('should NOT generate duplicate skills in a single mimic chest', () => {
+        for (let i = 0; i < 100; i++) {
+            const options = generateTreasureOptions(true, false, false);
+            const skills = options.map(o => o.skill.id);
+            const uniqueSkills = new Set(skills);
+            expect(uniqueSkills.size).toBe(options.length); // 3 unique skills
+        }
+    });
 });

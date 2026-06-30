@@ -143,6 +143,15 @@ export function executeTurn(pM, cM) {
                 // Optional: Sound or Visual for Doom triggering
                 sound.playSE('clash'); // Generic damage sound for now
             }
+            if (ex.type === 'INVINCIBLE_STORE') {
+                // Apply stored damage
+                const multiplier = ex.amount || 1;
+                const dmg = Math.floor(ex.stored * multiplier);
+                gameState.pHP = Math.max(0, gameState.pHP - dmg);
+                gameState.player.hp = gameState.pHP; // Sync
+                sound.playSE('clash');
+                showPassiveAlert('MIRAGE EXPIRED', `Received ${dmg} damage!`);
+            }
         });
     }
 
@@ -158,39 +167,12 @@ export function executeTurn(pM, cM) {
                 gameState.cpu.hp = gameState.cHP; // Sync
                 sound.playSE('clash');
             }
-        });
-
-        // Check for Player Expired Effects (MIRAGE)
-        const pUpdate = updateEffects(gameState.player.effects);
-        gameState.player.effects = pUpdate.effects;
-
-        pUpdate.expired.forEach(ex => {
             if (ex.type === 'INVINCIBLE_STORE') {
-                // Apply stored damage
-                // Legendary might halve it? logic.js only stored it. 
-                // The skill description says Legendary takes half.
-                // But logic.js didn't know if it was legendary or not when storing.
-                // Actually logic.js has access to skill when applying effect?
-                // But the effect persistence doesn't store rarity.
-                // I should store a multiplier in the effect when applying it in logic.js!
-                // Oops, I didn't do that.
-                // For now, I'll just apply full damage or implement the check here?
-                // I can't check skill rarity here easily.
-                // I should update logic.js to store 'multiplier' in the effect.
-                // But I can't update logic.js again right now without context switch.
-                // I will just apply full damage for now as MVP, or try to hack it.
-                // Wait, if I want to support legendary half-damage, I need to store it.
-                // Re-visiting logic.js plan: I missed adding 'damageMultiplier' to INVINCIBLE_STORE.
-                // However, I can just rely on 'effect value'? 
-                // MIRAGE effectValues: [3].
-                // Maybe I can store the multiplier in 'amount'? INVINCIBLE_STORE doesn't use amount.
-                // Yes! I'll update logic.js next to store multiplier in 'amount'.
-                // For now, let's assume 'amount' holds the multiplier (e.g. 1 or 0.5).
                 const multiplier = ex.amount || 1;
                 const dmg = Math.floor(ex.stored * multiplier);
-                gameState.pHP = Math.max(0, gameState.pHP - dmg);
+                gameState.cHP = Math.max(0, gameState.cHP - dmg);
+                gameState.cpu.hp = gameState.cHP; // Sync
                 sound.playSE('clash');
-                showPassiveAlert('MIRAGE EXPIRED', `Received ${dmg} damage!`);
             }
         });
     }
@@ -255,57 +237,50 @@ export function executeTurn(pM, cM) {
             // --- Player vs CPU Interaction Logic ---
             const isHeavyTarget = (move) => (move === 'CHARGE' || move === 'SKILL' || move === 'SKIP'); // Moves that leave open to heavy hit
 
-            // 1. Attack vs Attack -> Clash (Winner Logic)
+            // 1. 攻撃 vs 攻撃 -> 相殺（勝者判定ロジック）
             if (pM === 'ATTACK' && currentCM === 'ATTACK') {
-                // Calculate temporary total attack for comparison (ignoring defense for visual supremacy)
-                // Note: Actual damage calc uses defense, but visual 'clash win' is pure force.
-                // We need to access current turn buffed stats? 
-                // We can approximate or use base + temp.
-                // Better to check `result` or `gameState` if updated? 
-                // `gameState` is updated *after* `calculateTurnResult` returns but *before* this block is finalized?
-                // Wait, `calculateTurnResult` returns new state. 
-                // Let's use `gameState.player.atk` + `gameState.player.effects` (if any? tempAtk is in player object?)
-                // Actually `calculateTurnResult` uses `player` object passed in.
-                // To match exactly, let's just grab the ATK values from the objects we passed to calculateTurnResult.
-                // Or easier:
                 const pAtk = (gameState.player.atk || 0) + (gameState.player.tempAtk || 0);
                 const cAtk = (gameState.cpu.atk || 0) + (gameState.cpu.tempAtk || 0);
 
                 if (pAtk > cAtk) {
-                    pAnim = 'ATTACK_HEAVY'; // Player wins clash
-                    cAnim = 'CLASH';        // CPU sparks
+                    pAnim = 'ATTACK_HEAVY'; // プレイヤーが相殺に勝利
+                    cAnim = null;           // 重複を避けるためCPUのアニメーションをキャンセル
                 } else if (cAtk > pAtk) {
-                    cAnim = 'ATTACK_HEAVY'; // CPU wins clash
-                    pAnim = 'CLASH';        // Player sparks
+                    cAnim = 'ATTACK_HEAVY'; // CPUが相殺に勝利
+                    pAnim = null;           // プレイヤーのアニメーションをキャンセル
                 } else {
-                    pAnim = 'CLASH'; cAnim = 'CLASH'; // Even
+                    pAnim = 'CLASH'; cAnim = 'CLASH'; // 引き分け（それぞれの対象に火花を表示、重複なし）
                 }
                 sound.playSE('clash');
             }
-            // 2. Attack vs Guard -> Blocked Attack
+            // 2. 攻撃 vs 防御 -> ブロックされた攻撃
             else if (pM === 'ATTACK' && currentCM === 'GUARD') {
-                pAnim = 'ATTACK_BLOCKED'; // Player attack starts but is blocked
-                cAnim = 'BLOCK_HEAVY';    // CPU blocks heavily
+                pAnim = null;             // 重複を避けるためプレイヤーの斬撃をキャンセル
+                cAnim = 'BLOCK_HEAVY';    // CPUが強力に防御
                 sound.playSE('guard');
             }
             else if (pM === 'GUARD' && currentCM === 'ATTACK') {
-                cAnim = 'ATTACK_BLOCKED'; // CPU attack starts but is blocked
-                pAnim = 'BLOCK_HEAVY';    // Player blocks heavily
+                cAnim = null;             // CPUの斬撃をキャンセル
+                pAnim = 'BLOCK_HEAVY';    // プレイヤーが強力に防御
                 sound.playSE('guard');
             }
-            // 3. Attack vs Charge/Skill/Skip -> Heavy Hit
+            // 3. 攻撃 vs チャージ/スキル/スキップ -> 強力なヒット
             else if (pM === 'ATTACK' && isHeavyTarget(currentCM)) {
-                pAnim = 'ATTACK_HEAVY'; // Player hits hard
+                pAnim = 'ATTACK_HEAVY'; // プレイヤーの強力な攻撃
+                cAnim = null;           // CPUのチャージ/スキルをキャンセル
             }
             else if (isHeavyTarget(pM) && currentCM === 'ATTACK') {
-                cAnim = 'ATTACK_HEAVY'; // CPU hits hard
+                cAnim = 'ATTACK_HEAVY'; // CPUの強力な攻撃
+                pAnim = null;           // プレイヤーのチャージ/スキルをキャンセル
             }
-            // 4. Guard vs Non-Attack -> Weak Guard (Wasted)
+            // 4. 防御 vs 非攻撃 -> 弱い防御（無駄防御）
             else if (pM === 'GUARD' && currentCM !== 'ATTACK') {
                 pAnim = 'GUARD_WEAK';
+                // cAnimはそのまま（お互いの自己カードを対象にするため重複は発生しない）
             }
             else if (currentCM === 'GUARD' && pM !== 'ATTACK') {
                 cAnim = 'GUARD_WEAK';
+                // pAnimはそのまま
             }
 
             // Execute Animations Helper
@@ -421,7 +396,6 @@ function showFinal(cpuEWin) {
     dialogOverlay.classList.add('opacity-0', 'hidden');
 
     const ov = document.getElementById('result-overlay'), tit = document.getElementById('result-title'), desc = document.getElementById('result-desc');
-    const nextB = document.getElementById('btn-next-stage');
     const retryB = document.getElementById('btn-retry-tower');
     const streakB = document.getElementById('streak-result-box'); // Old simplistic one, keep hidden if tower mode new UI is used
 
@@ -436,7 +410,6 @@ function showFinal(cpuEWin) {
     desc.innerText = d;
     tit.className = `text-5xl font-black italic font-orbitron mb-2 uppercase tracking-tighter drop-shadow-lg z-10 ${res === 'VICTORY' ? 'text-emerald-400' : res === 'DEFEAT' ? 'text-rose-500' : 'text-white'}`;
 
-    nextB?.classList.add('hidden');
     retryB?.classList.add('hidden');
     streakB?.classList.add('hidden'); // Legacy container
 
@@ -693,61 +666,44 @@ export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false
         const rarities = ['LEGENDARY', 'EPIC', 'EPIC'];
         const exclusiveIds = ['PHANTOM_STEP', 'GRAVITY_ZONE', 'GAMBLER', 'OVERCLOCK', 'ZERO_FORM', 'MIRAGE'];
         let hasExclusive = false;
-        // Unused but updated for reference
-        // BOSS_ICONS check
+        const chosenSkillIds = new Set();
 
         rarities.forEach((rarity, index) => {
-            let pool;
-            // 最後のスロットでまだ限定スキルが出ていなければ、強制的に限定スキルから選ぶ（もしレアリティが合えば）
-            // または、最初から限定スキルを含めるようにプールを調整
-            if (index === 0) { // LEGENDARY slot
+            let pool = SKILLS.filter(s => s.rarity === rarity && !chosenSkillIds.has(s.id));
+            if (pool.length === 0) {
                 pool = SKILLS.filter(s => s.rarity === rarity);
-                // レジェンダリー限定のスキルを優先的にチェック
+            }
+            let skill;
+            if (index === 0) { // LEGENDARY slot
                 const exclusivePool = pool.filter(s => exclusiveIds.includes(s.id));
-                const skill = exclusivePool.length > 0 ? exclusivePool[Math.floor(Math.random() * exclusivePool.length)] : pool[Math.floor(Math.random() * pool.length)];
-
-                let desc = skill.description;
-                skill.effectValues.forEach(v => desc = desc.replace('?', v));
-                options.push({ type: 'skill', skill: { ...skill, description: desc } });
+                skill = exclusivePool.length > 0 ? exclusivePool[Math.floor(Math.random() * exclusivePool.length)] : pool[Math.floor(Math.random() * pool.length)];
                 if (exclusiveIds.includes(skill.id)) hasExclusive = true;
             } else { // EPIC slots
-                pool = SKILLS.filter(s => s.rarity === rarity);
-
-                // まだ限定スキルが出ていない場合、EPICの限定スキルを一つ入れる
-                let skill;
                 if (!hasExclusive && index === 2) {
                     const exclusivePool = pool.filter(s => exclusiveIds.includes(s.id));
                     skill = exclusivePool.length > 0 ? exclusivePool[Math.floor(Math.random() * exclusivePool.length)] : pool[Math.floor(Math.random() * pool.length)];
                     hasExclusive = true;
                 } else {
-                    // 他のスキルと被らないように（簡易的）
                     skill = pool[Math.floor(Math.random() * pool.length)];
                 }
-
-                let desc = skill.description;
-                skill.effectValues.forEach(v => desc = desc.replace('?', v));
-                options.push({ type: 'skill', skill: { ...skill, description: desc } });
                 if (exclusiveIds.includes(skill.id)) hasExclusive = true;
             }
+            chosenSkillIds.add(skill.id);
+            let desc = skill.description;
+            skill.effectValues.forEach(v => desc = desc.replace('?', v));
+            options.push({ type: 'skill', skill: { ...skill, description: desc } });
         });
         return options;
     }
 
     if (!isMimic) {
         // Regular Treasure or Boss First Phase (Item)
+        const chosenMeritIds = new Set();
         for (let i = 0; i < 3; i++) {
             // Filter: SKILL_COST_DOWN only appears if skill cost > 1
-            const availableMerits = ITEM_EFFECTS.MERITS.filter(item => {
+            let availableMerits = ITEM_EFFECTS.MERITS.filter(item => {
+                if (chosenMeritIds.has(item.id)) return false;
                 if (item.id === 'SKILL_COST_DOWN') {
-                    // Condition check: effectively same as checks inside item definition but explicit here if needed
-                    // The item definition condition: (p, ps) => ps !== null && (ps.cost + (p.skillCostBonus || 0)) > 0
-                    // User request: "appear only if skill cost is NOT 1 or less" -> meaning Cost > 1?
-                    // Current cost is (base + bonus). If (base + bonus) <= 1, effectively can't reduce further to 0?
-                    // Or simply meaningful reduction.
-                    // Let's rely on the item.condition if updated, or strictly check here.
-                    // The ITEM_EFFECTS definition for SKILL_COST_DOWN says: (p, ps) => ps !== null && (ps.cost + (p.skillCostBonus || 0)) > 0
-                    // This allows reducing 1 -> 0.
-                    // User request: "cost <= 1 excluded". So we need strict > 1.
                     const s = gameState.playerSkill;
                     if (!s) return false;
                     const currentCost = Math.max(0, s.cost + (gameState.pChar.skillCostBonus || 0));
@@ -756,7 +712,14 @@ export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false
                 return !item.condition || item.condition(gameState.pChar, gameState.playerSkill);
             });
 
+            if (availableMerits.length === 0) {
+                availableMerits = ITEM_EFFECTS.MERITS.filter(item => 
+                    !item.condition || item.condition(gameState.pChar, gameState.playerSkill)
+                );
+            }
+
             const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
+            chosenMeritIds.add(merit.id);
             const meritParam = getParamFromId(merit.id);
 
             // Risk Mapping Logic
@@ -804,10 +767,15 @@ export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false
         }
     } else {
         // Mimic (Skill Treasure)
+        const chosenSkillIds = new Set();
         for (let i = 0; i < 3; i++) {
             const rarity = pickRarity(gameState.floor, difficulty);
-            const pool = SKILLS.filter(s => s.rarity === rarity);
+            let pool = SKILLS.filter(s => s.rarity === rarity && !chosenSkillIds.has(s.id));
+            if (pool.length === 0) {
+                pool = SKILLS.filter(s => s.rarity === rarity);
+            }
             const skill = pool[Math.floor(Math.random() * pool.length)];
+            chosenSkillIds.add(skill.id);
             let desc = skill.description;
             skill.effectValues.forEach(v => desc = desc.replace('?', v));
             options.push({ type: 'skill', skill: { ...skill, description: desc } });
