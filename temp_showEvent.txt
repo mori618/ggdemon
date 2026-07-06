@@ -1,0 +1,300 @@
+export function showEvent() {
+    const eventOverlay = document.getElementById('event-overlay');
+    const choicesContainer = document.getElementById('event-choices-container');
+    const titleEl = document.getElementById('event-title');
+    const descEl = document.getElementById('event-description');
+    
+    // イベントの種類をランダムに決定
+    const eventTypes = [
+        'GOLD', 'TRAP', 'FREE_BUFF', 'TRIAL', 'MINI_BOSS', 'EXTRA_LIFE', 'SKILL_DROP',
+        'SKILL_UPGRADE', 'HIDDEN_TREASURE', 'DISCOUNT_SHOP', 'WEAK_ENEMY',
+        'INVINCIBLE_BUFF', 'ATK_BOOST_BUFF', 'CHG_BOOST_BUFF', 'ELITE_WARNING', 'TIME_LEAP',
+        'WEAK_BOSS', 'STRONG_BOSS', 'CURSED_TREASURE', 'LEGEND_TREASURE', 'STATUE_GREET', 'STATUE_BLESSING',
+        'MEGA_GOLD', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'
+    ];
+    let eType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+    
+    // スキルを持っていないのにスキル関連が選ばれた場合は引き直す
+    if (['SKILL_UPGRADE', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'].includes(eType) && !gameState.playerSkill) {
+        eType = 'FREE_BUFF';
+    }
+    
+    // フロアが浅い場合はTIME_LEAPを出さない
+    if (eType === 'TIME_LEAP' && gameState.floor < 3) {
+        eType = 'GOLD';
+    }
+    
+    choicesContainer.innerHTML = '';
+    
+    // Helper to close event
+    const closeEvent = (callback) => {
+        eventOverlay.classList.add('opacity-0');
+        setTimeout(() => {
+            eventOverlay.classList.add('hidden');
+            if (callback) callback();
+            else showMap();
+        }, 500);
+    };
+    
+    // Create button helper
+    const createBtn = (text, onClick, colorClass = 'bg-slate-800 text-slate-300 hover:bg-slate-700') => {
+        const btn = document.createElement('button');
+        btn.className = `w-full ${colorClass} py-3 rounded-xl font-black uppercase transition-all shadow-lg border-2 border-slate-600 active:scale-95`;
+        btn.innerText = text;
+        btn.onclick = () => { sound.playSE('click'); onClick(); };
+        choicesContainer.appendChild(btn);
+    };
+
+    if (eType === 'GOLD') {
+        titleEl.innerText = 'Lucky Encounter';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-amber-400';
+        descEl.innerText = '隠された宝箱を見つけた！コインを獲得した。';
+        createBtn('Continue', () => {
+            const amount = Math.floor(Math.random() * 20) + 15;
+            gameState.gold += amount;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+            closeEvent();
+        });
+    } else if (eType === 'TRAP') {
+        titleEl.innerText = 'Ambush!';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-rose-500';
+        descEl.innerText = '罠にかかってしまった！HPにダメージを受けた。';
+        createBtn('Ouch...', () => {
+            gameState.pHP = Math.max(1, gameState.pHP - 10);
+            gameState.player.hp = gameState.pHP;
+            closeEvent();
+        });
+    } else if (eType === 'FREE_BUFF') {
+        titleEl.innerText = 'Blessing';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-sky-400';
+        
+        const merit = ITEM_EFFECTS.MERITS[Math.floor(Math.random() * ITEM_EFFECTS.MERITS.length)];
+        const val = merit.valueRange[0] + Math.floor(Math.random() * (merit.valueRange[1] - merit.valueRange[0] + 1));
+        const effectText = merit.text.replace('$V', val);
+        
+        descEl.innerText = `不思議な泉の水を飲んだ。\n【効果】 ${effectText}`;
+        createBtn('Drink', () => {
+            merit.apply(gameState.pChar, val);
+            closeEvent();
+        });
+    } else if (eType === 'TRIAL') {
+        titleEl.innerText = 'Devil\'s Trial';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-purple-500';
+        
+        const merit = ITEM_EFFECTS.MERITS[Math.floor(Math.random() * ITEM_EFFECTS.MERITS.length)];
+        const val = (merit.valueRange[1] * 2);
+        const effectText = merit.text.replace('$V', val);
+        
+        descEl.innerText = `悪魔が取引を持ちかけてきた。\n「最大HPを半分差し出すなら、力を与えよう」\n【報酬】 ${effectText}`;
+        
+        createBtn('Accept (HP Half & Buff)', () => {
+            const newHp = Math.max(1, Math.floor(gameState.pChar.hp / 2));
+            gameState.pChar.hp = newHp;
+            gameState.pHP = Math.min(gameState.pHP, newHp);
+            merit.apply(gameState.pChar, val);
+            closeEvent();
+        }, 'bg-purple-900 text-purple-200 hover:bg-purple-800 border-purple-600');
+        
+        createBtn('Refuse', () => closeEvent());
+    } else if (eType === 'MINI_BOSS') {
+        titleEl.innerText = 'Mini Boss!';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-rose-600';
+        descEl.innerText = '強力な敵が立ち塞がっている！逃げることはできない。';
+        createBtn('Fight!', () => {
+            closeEvent(() => {
+                const bossId = gameState.bossDeck.draw();
+                gameState.cChar = BOSS_CHARACTERS.find(c => c.id === bossId);
+                document.getElementById('game-container').classList.remove('hidden');
+                setupBattleState();
+            });
+        }, 'bg-rose-900 text-rose-200 hover:bg-rose-800 border-rose-600');
+    } else if (eType === 'EXTRA_LIFE') {
+        titleEl.innerText = 'Resurrection Soul';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-emerald-400';
+        descEl.innerText = '輝く魂を見つけた！一度死んでも復活できるようになる。';
+        createBtn('Take it', () => {
+            gameState.lives++;
+            closeEvent();
+        }, 'bg-emerald-900 text-emerald-200 hover:bg-emerald-800 border-emerald-600');
+    } else if (eType === 'SKILL_DROP') {
+        titleEl.innerText = 'Ancient Scroll';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-yellow-400';
+        
+        const skill = SKILLS[Math.floor(Math.random() * SKILLS.length)];
+        let desc = skill.description;
+        skill.effectValues.forEach(v => desc = desc.replace('?', v));
+        
+        descEl.innerText = `古代の巻物を発見した。\n新たなスキル「${skill.name}」を習得できる。現在持っているスキルは上書きされます。\n\n【効果】 ${desc} (コスト: ${skill.cost})`;
+        
+        createBtn('Learn Skill', () => {
+            gameState.playerSkill = skill;
+            closeEvent();
+        }, 'bg-yellow-900 text-yellow-200 hover:bg-yellow-800 border-yellow-600');
+        
+        createBtn('Leave it', () => closeEvent());
+    } else if (eType === 'SKILL_UPGRADE') {
+        titleEl.innerText = 'Skill Awakening';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-cyan-400';
+        descEl.innerText = `不思議な光がスキル「${gameState.playerSkill.name}」を包み込む…。\nスキルのコストを下げるか、効果を高めることができる。`;
+        
+        const currentCost = Math.max(0, gameState.playerSkill.cost + (gameState.pChar.skillCostBonus || 0));
+        
+        if (currentCost > 0) {
+            createBtn('Cost Down (-1)', () => {
+                gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+                closeEvent();
+            }, 'bg-cyan-900 text-cyan-200 hover:bg-cyan-800 border-cyan-600');
+        }
+        
+        createBtn('Effect Boost (+1)', () => {
+            gameState.pChar.skillEffectBonus = (gameState.pChar.skillEffectBonus || 0) + 1;
+            closeEvent();
+        }, 'bg-blue-900 text-blue-200 hover:bg-blue-800 border-blue-600');
+        
+    } else if (eType === 'HIDDEN_TREASURE') {
+        titleEl.innerText = 'Hidden Room';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-amber-500';
+        descEl.innerText = '壁の裏側に隠し部屋を見つけた！\n中には宝箱が置かれている。';
+        createBtn('Open Chest', () => {
+            closeEvent(() => {
+                showTreasure();
+            });
+        }, 'bg-amber-900 text-amber-200 hover:bg-amber-800 border-amber-600');
+    } else if (eType === 'DISCOUNT_SHOP') {
+        titleEl.innerText = 'Black Market';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-purple-400';
+        descEl.innerText = '怪しげな商人が「良いものを安く売ってやる」と声をかけてきた…。\n（全品半額）';
+        createBtn('Enter Market', () => {
+            closeEvent(() => {
+                showShop(true);
+            });
+        }, 'bg-purple-900 text-purple-200 hover:bg-purple-800 border-purple-600');
+        createBtn('Leave', () => closeEvent());
+    } else if (eType === 'WEAK_ENEMY') {
+        titleEl.innerText = 'Weakened Enemy';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-emerald-500';
+        descEl.innerText = '傷ついた敵が休んでいる。倒せばゴールドが手に入るだろう！';
+        createBtn('Attack!', () => {
+            closeEvent(() => {
+                const charId = gameState.mobDeck.draw();
+                const baseChar = CHARACTERS.find(c => c.id === charId);
+                gameState.cChar = JSON.parse(JSON.stringify(baseChar));
+                gameState.cChar.name = `Weakened ${baseChar.name}`;
+                gameState.cChar.hp = Math.max(1, Math.floor(baseChar.hp / 2));
+                gameState.cChar.atk = Math.max(1, Math.floor(baseChar.atk / 2));
+                
+                document.getElementById('game-container').classList.remove('hidden');
+                setupBattleState();
+            });
+        }, 'bg-emerald-900 text-emerald-200 hover:bg-emerald-800 border-emerald-600');
+        createBtn('Leave it', () => closeEvent());
+    } else if (eType === 'INVINCIBLE_BUFF') {
+        titleEl.innerText = 'Aegis Blessing';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-sky-300';
+        descEl.innerText = '女神の加護を得た！\n次の戦闘で開始から3ターンの間、受けるダメージを999軽減する。';
+        createBtn('Accept', () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'DMG_REDUCE', amount: 999, turns: 3 });
+            closeEvent();
+        }, 'bg-sky-900 text-sky-200 hover:bg-sky-800 border-sky-600');
+    } else if (eType === 'ATK_BOOST_BUFF') {
+        titleEl.innerText = 'Warrior\'s Blood';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-rose-400';
+        descEl.innerText = '戦士の血が滾る！\n次の戦闘で開始から3ターンの間、攻撃力(ATK)が現在の2倍になる。';
+        createBtn('Accept', () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'ATK_UP', amount: gameState.pChar.atk, turns: 3 });
+            closeEvent();
+        }, 'bg-rose-900 text-rose-200 hover:bg-rose-800 border-rose-600');
+    } else if (eType === 'CHG_BOOST_BUFF') {
+        titleEl.innerText = 'Mage\'s Insight';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-purple-400';
+        descEl.innerText = '魔導の真理を垣間見た！\n次の戦闘で開始から3ターンの間、チャージ効率(ChgE)が現在の2倍になる。';
+        createBtn('Accept', () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'CHGE_UP', amount: gameState.pChar.chgE, turns: 3 });
+            closeEvent();
+        }, 'bg-purple-900 text-purple-200 hover:bg-purple-800 border-purple-600');
+    } else if (eType === 'MEGA_GOLD') {
+        titleEl.innerText = 'Treasure Hoard';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-amber-300';
+        descEl.innerText = 'まばゆく光る大量の金貨の山を発見した！';
+        createBtn('Take all', () => {
+            const amount = Math.floor(Math.random() * 51) + 50; // 50〜100
+            gameState.gold += amount;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+            closeEvent();
+        }, 'bg-amber-900 text-amber-200 hover:bg-amber-800 border-amber-600');
+    } else if (eType === 'PAY_SKILL_UPGRADE') {
+        titleEl.innerText = 'Mystic Blacksmith';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-orange-400';
+        
+        if (!gameState.playerSkill) {
+            descEl.innerText = '鍛冶屋が待ち構えていたが、君はスキルを持っていなかった。\n「出直してきな！」';
+            createBtn('Leave', () => closeEvent());
+        } else {
+            descEl.innerText = `「コインを払えば、アンタのスキル『${gameState.playerSkill.name}』を強化してやるよ」`;
+            const costDownPrice = 50;
+            const effectUpPrice = 30;
+            
+            const currentCost = Math.max(0, gameState.playerSkill.cost + (gameState.pChar.skillCostBonus || 0));
+            
+            if (currentCost > 0) {
+                if (gameState.gold >= costDownPrice) {
+                    createBtn(`Cost Down (-1) [${costDownPrice}G]`, () => {
+                        gameState.gold -= costDownPrice;
+                        document.getElementById('player-gold-val').innerText = gameState.gold;
+                        gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+                        closeEvent();
+                    }, 'bg-orange-900 text-orange-200 hover:bg-orange-800 border-orange-600');
+                } else {
+                    const btn = document.createElement('button');
+                    btn.className = `w-full bg-slate-800 text-slate-500 py-3 rounded-xl font-black uppercase transition-all shadow-lg border-2 border-slate-700 opacity-50 cursor-not-allowed`;
+                    btn.innerText = `Cost Down (-1) [${costDownPrice}G] - Not enough G`;
+                    choicesContainer.appendChild(btn);
+                }
+            }
+            
+            if (gameState.gold >= effectUpPrice) {
+                createBtn(`Effect Boost (+1) [${effectUpPrice}G]`, () => {
+                    gameState.gold -= effectUpPrice;
+                    document.getElementById('player-gold-val').innerText = gameState.gold;
+                    gameState.pChar.skillEffectBonus = (gameState.pChar.skillEffectBonus || 0) + 1;
+                    closeEvent();
+                }, 'bg-red-900 text-red-200 hover:bg-red-800 border-red-600');
+            } else {
+                const btn = document.createElement('button');
+                btn.className = `w-full bg-slate-800 text-slate-500 py-3 rounded-xl font-black uppercase transition-all shadow-lg border-2 border-slate-700 opacity-50 cursor-not-allowed`;
+                btn.innerText = `Effect Boost (+1) [${effectUpPrice}G] - Not enough G`;
+                choicesContainer.appendChild(btn);
+            }
+            
+            createBtn('Leave', () => closeEvent());
+        }
+    } else if (eType === 'SKILL_SELL') {
+        titleEl.innerText = 'Skill Merchant';
+        titleEl.className = 'text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-blue-400';
+        
+        if (!gameState.playerSkill) {
+            descEl.innerText = '商人がいるが、売るスキルを持っていないようだ。';
+            createBtn('Leave', () => closeEvent());
+        } else {
+            const sellPrice = 60;
+            descEl.innerText = `「君のスキル『${gameState.playerSkill.name}』、なかなか良いものだ。\n${sellPrice}Gで買い取らせてくれないか？」\n（スキルを失います）`;
+            createBtn(`Sell Skill (+${sellPrice}G)`, () => {
+                gameState.gold += sellPrice;
+                document.getElementById('player-gold-val').innerText = gameState.gold;
+                gameState.playerSkill = null;
+                // スキルのボーナスもリセットしておく
+                gameState.pChar.skillCostBonus = 0;
+                gameState.pChar.skillEffectBonus = 0;
+                closeEvent();
+            }, 'bg-blue-900 text-blue-200 hover:bg-blue-800 border-blue-600');
+            createBtn('Refuse', () => closeEvent());
+        }
+    }
+    
+    lucide.createIcons();
+    eventOverlay.classList.remove('hidden');
+    setTimeout(() => eventOverlay.classList.remove('opacity-0'), 10);
+}ようだ。';

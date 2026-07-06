@@ -2,7 +2,7 @@ import { CHARACTERS, GAME_MODES, NETWORK_EVENTS, BOSS_CHARACTERS } from './const
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak, Deck } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
-import { setupBattleState, getCpuMove, executeTurn } from './game.js';
+import { setupBattleState, getCpuMove, executeTurn, generateTowerMap, showMap } from './game.js';
 import { network } from './network.js';
 
 window.onload = () => {
@@ -400,7 +400,9 @@ network.setOnData((data) => {
 
 function startTower(diff = 'NORMAL') {
     gameState.floor = 0;
+    gameState.currentFloorIndex = 0;
     gameState.towerDifficulty = diff;
+    gameState.gold = 0;
 
     // 難易度に応じた残機設定
     if (diff === 'EASY') gameState.lives = 3;
@@ -411,17 +413,24 @@ function startTower(diff = 'NORMAL') {
     gameState.winsSinceChest = 0;
     gameState.playerSkill = null;
     gameState.aiLevel = 'NORMAL';
+    
+    // Tower Stats reset
+    gameState.enemiesDefeated = 0;
+    gameState.defeatedBosses = [];
 
     // Initialize Decks
     gameState.mobDeck = new Deck(CHARACTERS.map(c => c.id));
     gameState.bossDeck = new Deck(BOSS_CHARACTERS.map(c => c.id));
 
-    gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
     document.getElementById('select-screen').classList.add('hidden');
     document.getElementById('tower-indicator').classList.remove('hidden');
-    setupBattleState();
+    
+    // マップの生成と表示
+    gameState.towerMap = generateTowerMap(5);
+    gameState.currentMapNode = gameState.towerMap[0][0]; // START node
+    
+    showMap();
 }
-
 
 function startGame() {
     sound.playSE('ready');

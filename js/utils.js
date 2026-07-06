@@ -27,7 +27,11 @@ export const gameState = {
     bossDeck: null,
     // Tracking stats
     enemiesDefeated: 0,
-    defeatedBosses: []
+    defeatedBosses: [],
+    gold: 0,
+    towerMap: [],
+    currentMapNode: null,
+    currentFloorIndex: 0
 };
 
 export class Deck {

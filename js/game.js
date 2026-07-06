@@ -6,7 +6,8 @@ import { calculateTurnResult, updateEffects, getCpuMoveLogic, generateTowerEnemy
 
 export function setupBattleState() {
     gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
-    gameState.player.effects = [];
+    gameState.player.effects = gameState.nextBattleEffects ? [...gameState.nextBattleEffects] : [];
+    gameState.nextBattleEffects = []; // 一度使ったらクリア
     gameState.player.tempAtk = gameState.player.tempGrdC = gameState.player.tempChgE = gameState.player.tempChgC = gameState.player.tempDmgReduce = 0;
 
     const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 5 === 0);
@@ -27,6 +28,40 @@ export function setupBattleState() {
         const result = generateTowerEnemy(gameState.floor, gameState.mobDeck, gameState.bossDeck, isTreasure, difficulty);
         baseCpu = result.cpu;
         gameState.aiLevel = result.aiLevel;
+        
+        // ボスフラグの処理
+        if (isBoss && gameState.nextBossMod) {
+            if (gameState.nextBossMod === 'WEAK') {
+                baseCpu.name = "Weakened " + baseCpu.name;
+                baseCpu.hp = Math.max(1, Math.floor(baseCpu.hp * 0.7));
+                baseCpu.atk = Math.max(1, Math.floor(baseCpu.atk * 0.8));
+                if (gameState.aiLevel === 'EXPERT') gameState.aiLevel = 'HARD';
+                else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'NORMAL';
+            } else if (gameState.nextBossMod === 'STRONG') {
+                baseCpu.name = "Awakened " + baseCpu.name;
+                baseCpu.hp = Math.floor(baseCpu.hp * 1.5);
+                baseCpu.atk = Math.floor(baseCpu.atk * 1.2);
+                baseCpu.chgE += 1;
+                if (gameState.aiLevel === 'EASY') gameState.aiLevel = 'NORMAL';
+                else if (gameState.aiLevel === 'NORMAL') gameState.aiLevel = 'HARD';
+                else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'EXPERT';
+                gameState.currentBossIsStrong = true; // 勝利時の報酬用
+            }
+            gameState.nextBossMod = null; // フラグ消費
+        }
+        
+        // エリートフラグの処理
+        if (gameState.nextBattleIsElite) {
+            baseCpu.name = "Elite " + baseCpu.name;
+            baseCpu.hp += 3;
+            baseCpu.atk += 1;
+            baseCpu.chgE += 1;
+            // AIを賢くする
+            if (gameState.aiLevel === 'EASY') gameState.aiLevel = 'NORMAL';
+            else if (gameState.aiLevel === 'NORMAL') gameState.aiLevel = 'HARD';
+            else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'EXPERT';
+            gameState.nextBattleIsElite = false; // フラグを消費
+        }
 
         baseCpu.effects = []; // Initialize effects before passive
         if (baseCpu.passive) {
@@ -484,7 +519,24 @@ function showFinal(cpuEWin) {
 
 function handleTowerVictory() {
     document.getElementById('result-overlay').classList.add('hidden');
-    showFloorClearAnim(() => showTreasure());
+    // ゴールドの獲得
+    let gainedGold = Math.floor(Math.random() * 11) + 10;
+    
+    if (gameState.currentBossIsStrong) {
+        gainedGold += 100; // 強化ボスの場合は大量のゴールドを獲得
+        gameState.currentBossIsStrong = false; // フラグ消費
+    }
+    
+    gameState.gold += gainedGold;
+    document.getElementById('player-gold-val').innerText = gameState.gold;
+    
+    // showFloorClearAnim の後に宝箱ではなくマップへ
+    showFloorClearAnim(() => {
+        // 次の階層へ（マップ画面で選択した時点でfloorは進んでいるが、ここで念のため再同期）
+        gameState.winStreak++;
+        gameState.winsSinceChest++;
+        showMap();
+    });
 }
 
 function showFloorClearAnim(callback) {
@@ -519,106 +571,6 @@ function showFloorClearAnim(callback) {
     }, 2200);
 }
 
-export function showTreasure(forceSkillPhase = false) {
-    const treasureOverlay = document.getElementById('treasure-overlay');
-    const cardsContainer = document.getElementById('treasure-cards-container');
-    const isMimic = (gameState.cpu.id === 'TREASURE_CHEST');
-    const isBoss = (gameState.floor % 5 === 0);
-    const options = generateTreasureOptions(isMimic, isBoss, forceSkillPhase);
-    cardsContainer.innerHTML = '';
-
-    const titleEl = treasureOverlay.querySelector('h2');
-    const descEl = treasureOverlay.querySelector('p');
-
-    if (forceSkillPhase) {
-        titleEl.innerText = "Ultimate Skill Unlocked";
-        descEl.innerText = "BOSS REWARD: CHOOSE A HIGH-RANK SKILL";
-    } else {
-        titleEl.innerText = "Choose Your Reward";
-        descEl.innerText = "Select one of three options";
-    }
-
-    options.forEach(option => {
-        const card = document.createElement('div');
-        let title, description, icon, borderColor = 'border-slate-600', textColor = 'text-white', iconColor = 'text-amber-400';
-        if (option.type === 'skill') {
-            const skill = option.skill;
-            title = `新スキル: ${skill.name}`;
-            description = `${skill.description} (コスト: ${skill.cost})`;
-            icon = 'star';
-
-            switch (skill.rarity) {
-                case 'COMMON':
-                    borderColor = 'border-slate-500';
-                    textColor = 'text-slate-300';
-                    iconColor = 'text-slate-400';
-                    break;
-                case 'RARE':
-                    borderColor = 'border-blue-500';
-                    textColor = 'text-blue-300';
-                    iconColor = 'text-blue-400';
-                    title += ' <span class="text-[10px] bg-blue-900/50 text-blue-300 px-1 rounded border border-blue-500/50 align-middle">RARE</span>';
-                    break;
-                case 'EPIC':
-                    borderColor = 'border-purple-500';
-                    textColor = 'text-purple-300';
-                    iconColor = 'text-purple-400';
-                    title += ' <span class="text-[10px] bg-purple-900/50 text-purple-300 px-1 rounded border border-purple-500/50 align-middle">EPIC</span>';
-                    break;
-                case 'LEGENDARY':
-                    borderColor = 'border-amber-500';
-                    textColor = 'text-amber-300';
-                    iconColor = 'text-amber-400';
-                    title += ' <span class="text-[10px] bg-amber-900/50 text-amber-300 px-1 rounded border border-amber-500/50 align-align-middle">LEGENDARY</span>';
-                    break;
-            }
-
-        } else {
-            title = '強化アイテム';
-
-            if (option.demerit) {
-                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', option.demerit.value)}</span>`;
-            } else {
-                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span>`;
-            }
-            icon = 'gem';
-        }
-
-        card.className = `w-full max-w-md mx-auto bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-row items-center gap-4 group hover:scale-[1.02]`;
-        card.innerHTML = `
-            <div class="flex-shrink-0">
-                <i data-lucide="${icon}" class="w-12 h-12 ${iconColor}"></i>
-            </div>
-            <div class="flex-1 text-left">
-                <h3 class="font-orbitron font-bold text-lg mb-1 ${textColor}">${title}</h3>
-                <div class="text-xs text-slate-400 font-bold leading-relaxed">${option.description || description}</div>
-            </div>
-        `;
-        card.onclick = () => selectTreasure(option, forceSkillPhase);
-        cardsContainer.appendChild(card);
-    });
-
-    if (!forceSkillPhase) {
-        // Add Skip Button
-        const skipCard = document.createElement('div');
-        skipCard.className = 'w-full max-w-md mx-auto bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-row items-center gap-4 group hover:scale-[1.02]';
-        skipCard.innerHTML = `
-            <div class="flex-shrink-0">
-                <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
-            </div>
-            <div class="flex-1 text-left">
-                <h3 class="font-orbitron font-bold text-lg mb-1 text-white">SKIP</h3>
-                <div class="text-xs text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
-            </div>
-        `;
-        skipCard.onclick = () => selectTreasure({ type: 'skip' }, false);
-        cardsContainer.appendChild(skipCard);
-    }
-
-    lucide.createIcons();
-    treasureOverlay.classList.remove('hidden');
-    setTimeout(() => treasureOverlay.classList.add('opacity-100'), 10);
-}
 
 const getRarityWeights = (floor, difficulty = 'NORMAL') => {
     let weights = { COMMON: 90, RARE: 10, EPIC: 0, LEGENDARY: 0 };
@@ -812,8 +764,970 @@ export function selectTreasure(reward, fromForceSkillPhase = false) {
     treasureOverlay.classList.remove('opacity-100');
     setTimeout(() => {
         treasureOverlay.classList.add('hidden');
-        gameState.winStreak++; gameState.floor++;
-        gameState.cChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
-        setupBattleState();
+        showMap();
     }, 500);
+}
+
+export function generateTowerMap(totalFloors = 5) {
+    const map = [];
+    let currentId = 0;
+
+    // Helper to create a node
+    const createNode = (floor, type) => {
+        return {
+            id: `node-${currentId++}`,
+            floor,
+            type,
+            parents: [],
+            children: []
+        };
+    };
+
+    // Floor 0 (Start)
+    const startNode = createNode(0, 'START');
+    map.push([startNode]);
+
+    let prevLayer = [startNode];
+
+    for (let f = 1; f < totalFloors; f++) {
+        const numNodes = Math.floor(Math.random() * 2) + 2; // 2 or 3 nodes
+        const currentLayer = [];
+
+        for (let i = 0; i < numNodes; i++) {
+            let type = 'BATTLE';
+            const r = Math.random();
+            if (f === totalFloors - 1) {
+                // Boss preceding floor: High chance of shop or treasure
+                if (r < 0.4) type = 'SHOP';
+                else if (r < 0.8) type = 'TREASURE';
+                else type = 'EVENT';
+            } else {
+                if (r < 0.5) type = 'BATTLE';
+                else if (r < 0.65) type = 'TREASURE';
+                else if (r < 0.8) type = 'SHOP';
+                else type = 'EVENT';
+            }
+            const node = createNode(f, type);
+            currentLayer.push(node);
+        }
+
+        // Connect prevLayer to currentLayer (ensure all are connected)
+        // Simple DAG generation
+        prevLayer.forEach(p => {
+            // connect to 1 or 2 nodes in current layer
+            let targets = [...currentLayer].sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 2) + 1);
+            targets.forEach(t => {
+                if (!p.children.includes(t.id)) {
+                    p.children.push(t.id);
+                    t.parents.push(p.id);
+                }
+            });
+        });
+
+        // Ensure all current nodes have at least one parent
+        currentLayer.forEach(c => {
+            if (c.parents.length === 0) {
+                const p = prevLayer[Math.floor(Math.random() * prevLayer.length)];
+                p.children.push(c.id);
+                c.parents.push(p.id);
+            }
+        });
+
+        map.push(currentLayer);
+        prevLayer = currentLayer;
+    }
+
+    // Boss Floor
+    const bossNode = createNode(totalFloors, 'BOSS');
+    prevLayer.forEach(p => {
+        p.children.push(bossNode.id);
+        bossNode.parents.push(p.id);
+    });
+    map.push([bossNode]);
+
+    return map;
+}
+
+export function showMap() {
+    const mapOverlay = document.getElementById('map-overlay');
+    const container = document.getElementById('map-container');
+    const choicesContainer = document.getElementById('map-choices-container');
+    
+    // Hide battle elements if they are visible
+    document.getElementById('game-container').classList.add('hidden');
+    document.getElementById('treasure-overlay').classList.add('hidden');
+    
+    mapOverlay.classList.remove('hidden');
+    
+    renderMapNodes(container);
+    renderMapChoices(choicesContainer);
+}
+
+function renderMapNodes(container) {
+    container.innerHTML = '';
+    
+    // Reverse the map array to show BOSS at top and START at bottom
+    const reversedMap = [...gameState.towerMap].reverse();
+    const mapHeight = reversedMap.length;
+    
+    // Draw SVG connections
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.width = '100%';
+    svg.style.height = '100%';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '0';
+    container.appendChild(svg);
+    
+    const nodeElements = {};
+    const layers = [];
+    
+    // Create node elements
+    reversedMap.forEach((layerNodes, revIndex) => {
+        const layerDiv = document.createElement('div');
+        layerDiv.className = 'flex justify-around items-center w-full my-6 z-10 relative';
+        
+        layerNodes.forEach(node => {
+            const nodeDiv = document.createElement('div');
+            const isCurrent = gameState.currentMapNode && gameState.currentMapNode.id === node.id;
+            const isPast = gameState.currentFloorIndex > node.floor;
+            const isSelectable = gameState.currentMapNode && gameState.currentMapNode.children.includes(node.id);
+            
+            let icon = 'help-circle';
+            let colorClass = 'text-slate-500';
+            let bgClass = 'bg-slate-800 border-slate-700';
+            
+            if (node.type === 'START') { icon = 'flag'; colorClass = 'text-emerald-400'; }
+            else if (node.type === 'BATTLE') { icon = 'swords'; colorClass = 'text-rose-400'; }
+            else if (node.type === 'ELITE') { icon = 'skull'; colorClass = 'text-rose-600'; }
+            else if (node.type === 'TREASURE') { icon = 'gem'; colorClass = 'text-amber-400'; }
+            else if (node.type === 'SHOP') { icon = 'store'; colorClass = 'text-sky-400'; }
+            else if (node.type === 'EVENT') { icon = 'help-circle'; colorClass = 'text-purple-400'; }
+            else if (node.type === 'BOSS') { icon = 'skull'; colorClass = 'text-rose-500'; bgClass = 'bg-slate-900 border-rose-900'; }
+            
+            if (isCurrent) {
+                bgClass = 'bg-slate-700 border-emerald-400 animate-pulse';
+                colorClass = 'text-emerald-400';
+            } else if (isPast) {
+                bgClass = 'bg-slate-900 border-slate-800';
+                colorClass = 'text-slate-600';
+            } else if (isSelectable) {
+                bgClass = 'bg-slate-800 border-sky-400';
+            }
+            
+            nodeDiv.className = `w-12 h-12 rounded-full border-2 ${bgClass} flex justify-center items-center relative transition-all`;
+            nodeDiv.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6 ${colorClass}"></i>`;
+            nodeDiv.id = `ui-${node.id}`;
+            
+            layerDiv.appendChild(nodeDiv);
+            nodeElements[node.id] = { node, element: nodeDiv, layerIndex: mapHeight - 1 - revIndex };
+        });
+        
+        layers.push(layerDiv);
+        container.appendChild(layerDiv);
+    });
+    
+    // Draw lines after layout is settled
+    setTimeout(() => {
+        const containerRect = container.getBoundingClientRect();
+        
+        Object.values(nodeElements).forEach(({ node, element }) => {
+            const rect = element.getBoundingClientRect();
+            const x1 = rect.left - containerRect.left + rect.width / 2;
+            const y1 = rect.top - containerRect.top + rect.height / 2;
+            
+            node.children.forEach(childId => {
+                if (nodeElements[childId]) {
+                    const childElement = nodeElements[childId].element;
+                    const childRect = childElement.getBoundingClientRect();
+                    const x2 = childRect.left - containerRect.left + childRect.width / 2;
+                    const y2 = childRect.top - containerRect.top + childRect.height / 2;
+                    
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', x1);
+                    line.setAttribute('y1', y1);
+                    line.setAttribute('x2', x2);
+                    line.setAttribute('y2', y2);
+                    
+                    // Style line based on if it's a taken path
+                    const isTakenPath = gameState.currentFloorIndex > node.floor && 
+                                        gameState.currentMapNode.floor >= nodeElements[childId].node.floor; // simplistic check
+                    
+                    line.setAttribute('stroke', isTakenPath ? '#34d399' : '#334155');
+                    line.setAttribute('stroke-width', '3');
+                    line.setAttribute('stroke-dasharray', isTakenPath ? '0' : '5,5');
+                    
+                    svg.appendChild(line);
+                }
+            });
+        });
+        lucide.createIcons();
+    }, 50);
+}
+
+function renderMapChoices(container) {
+    container.innerHTML = '';
+    if (!gameState.currentMapNode) return;
+    
+    const childrenIds = gameState.currentMapNode.children;
+    
+    if (childrenIds.length === 0) {
+        // Handle end of tower
+        container.innerHTML = '<div class="text-emerald-400 font-orbitron text-xl">TOWER CLEARED!</div>';
+        return;
+    }
+    
+    const nextLayer = gameState.towerMap[gameState.currentFloorIndex + 1];
+    
+    childrenIds.forEach(childId => {
+        const targetNode = nextLayer.find(n => n.id === childId);
+        if (!targetNode) return;
+        
+        const btn = document.createElement('button');
+        
+        let icon = 'swords';
+        let label = 'BATTLE';
+        let bgClass = 'bg-rose-950/40 border-rose-900 text-rose-300 hover:bg-rose-900/60 hover:border-rose-700 hover:text-rose-100';
+        let iconColor = 'text-rose-400 group-hover:text-rose-200';
+        
+        if (targetNode.type === 'TREASURE') {
+            icon = 'gem';
+            label = 'TREASURE';
+            bgClass = 'bg-amber-950/40 border-amber-900 text-amber-300 hover:bg-amber-900/60 hover:border-amber-700 hover:text-amber-100';
+            iconColor = 'text-amber-400 group-hover:text-amber-200';
+        } else if (targetNode.type === 'SHOP') {
+            icon = 'store';
+            label = 'SHOP';
+            bgClass = 'bg-sky-950/40 border-sky-900 text-sky-300 hover:bg-sky-900/60 hover:border-sky-700 hover:text-sky-100';
+            iconColor = 'text-sky-400 group-hover:text-sky-200';
+        } else if (targetNode.type === 'EVENT') {
+            icon = 'help-circle';
+            label = 'EVENT';
+            bgClass = 'bg-purple-950/40 border-purple-900 text-purple-300 hover:bg-purple-900/60 hover:border-purple-700 hover:text-purple-100';
+            iconColor = 'text-purple-400 group-hover:text-purple-200';
+        } else if (targetNode.type === 'BOSS') {
+            icon = 'skull';
+            label = 'BOSS';
+            bgClass = 'bg-rose-950 border-rose-600 text-white hover:bg-rose-900 hover:border-rose-400 hover:shadow-[0_0_15px_rgba(225,29,72,0.5)]';
+            iconColor = 'text-rose-400 group-hover:text-white';
+        }
+        
+        btn.className = `command-btn group w-24 h-24 flex flex-col items-center justify-center border-2 rounded-2xl transition-all shadow-lg backdrop-blur-sm relative overflow-hidden active:scale-95 ${bgClass}`;
+        
+        btn.innerHTML = `
+            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
+            <i data-lucide="${icon}" class="w-8 h-8 mb-2 z-10 transition-colors drop-shadow-md ${iconColor}"></i>
+            <span class="font-orbitron font-black text-[10px] tracking-widest z-10 transition-colors uppercase">${label}</span>
+        `;
+        
+        btn.onclick = () => window.enterRoom(targetNode);
+        container.appendChild(btn);
+    });
+    
+    lucide.createIcons();
+}
+
+window.enterRoom = (node) => {
+    sound.playSE('click');
+    gameState.currentMapNode = node;
+    gameState.currentFloorIndex = node.floor;
+    gameState.floor = node.floor; // Sync with existing floor logic
+    
+    document.getElementById('current-floor-val').innerText = gameState.floor;
+    
+    const mapOverlay = document.getElementById('map-overlay');
+    mapOverlay.classList.add('hidden');
+    
+    // Route to appropriate handler
+    if (node.type === 'BATTLE' || node.type === 'BOSS' || node.type === 'ELITE') {
+        // Battle
+        const deck = (node.type === 'BOSS') ? gameState.bossDeck : gameState.mobDeck;
+        const charId = deck.draw();
+        gameState.cChar = CHARACTERS.find(c => c.id === charId) || BOSS_CHARACTERS.find(c => c.id === charId);
+        
+        setupBattleState();
+    } else if (node.type === 'TREASURE') {
+        // Treasure
+        handleTreasureRoom();
+    } else if (node.type === 'SHOP') {
+        // Shop
+        handleShopRoom();
+    } else if (node.type === 'EVENT') {
+        // Event
+        showEvent();
+    }
+};
+
+export function setupEventScreen(title, desc, npcIcon, npcColor, options) {
+    const battleArea = document.getElementById('enemy-area');
+    const eventNpcArea = document.getElementById('event-npc-area');
+    const commandWrapper = document.getElementById('command-wrapper');
+    const eventCommandWrapper = document.getElementById('event-command-wrapper');
+    const iconContainer = document.getElementById('event-npc-icon-container');
+    const titleEl = document.getElementById('event-ui-title');
+    const descEl = document.getElementById('event-ui-desc');
+    const nameLabel = document.getElementById('event-npc-name-label');
+
+    // Toggle views
+    battleArea.classList.add('hidden');
+    eventNpcArea.classList.remove('hidden');
+    commandWrapper.classList.add('hidden');
+    eventCommandWrapper.classList.remove('hidden');
+
+    // Set NPC Icon
+    iconContainer.innerHTML = `<i data-lucide="${npcIcon}" class="w-20 h-20 ${npcColor} drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]"></i>`;
+    
+    // Set Texts
+    titleEl.innerText = title;
+    titleEl.className = `text-3xl font-black font-orbitron italic tracking-widest uppercase mb-1 drop-shadow-md ${npcColor}`;
+    descEl.innerText = desc;
+    nameLabel.innerText = title;
+
+    // Set Buttons
+    for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`event-cmd-${i}`);
+        if (options[i]) {
+            const opt = options[i];
+            
+            let colorClass = opt.colorClass || 'bg-slate-700 hover:bg-slate-600 text-slate-200';
+            btn.className = `command-btn ${colorClass} w-24 h-24 flex flex-col items-center justify-center rounded-2xl shadow-lg border-2 border-white/10 transition-all hover:scale-105 active:scale-95`;
+            
+            if (opt.disabled) {
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.classList.remove('hover:scale-105', 'active:scale-95');
+                btn.onclick = null;
+            } else {
+                btn.onclick = () => {
+                    if (window.sound) window.sound.playSE('click');
+                    opt.onClick();
+                };
+            }
+            btn.innerHTML = `<i data-lucide="${opt.icon || 'circle'}" class="w-8 h-8 mb-2"></i><span class="text-xs font-bold font-orbitron tracking-wider">${opt.text}</span>`;
+            btn.classList.remove('hidden');
+        } else {
+            btn.classList.add('hidden');
+        }
+    }
+    
+    if (window.lucide) window.lucide.createIcons();
+}
+
+export function closeEventScreen() {
+    document.getElementById('enemy-area').classList.remove('hidden');
+    document.getElementById('event-npc-area').classList.add('hidden');
+    document.getElementById('command-wrapper').classList.remove('hidden');
+    document.getElementById('event-command-wrapper').classList.add('hidden');
+}
+
+export function showEvent() {
+    // Helper to close event and proceed to map
+    const closeEvent = () => {
+        closeEventScreen();
+        showMap();
+    };
+
+    const eventTypes = [
+        'GOLD', 'TRAP', 'FREE_BUFF', 'TRIAL', 'MINI_BOSS', 'EXTRA_LIFE', 'SKILL_DROP',
+        'SKILL_UPGRADE', 'HIDDEN_TREASURE', 'DISCOUNT_SHOP', 'WEAK_ENEMY',
+        'INVINCIBLE_BUFF', 'ATK_BOOST_BUFF', 'CHG_BOOST_BUFF', 'ELITE_WARNING', 'TIME_LEAP',
+        'WEAK_BOSS', 'STRONG_BOSS', 'CURSED_TREASURE', 'LEGEND_TREASURE', 'STATUE_GREET', 'STATUE_BLESSING',
+        'MEGA_GOLD', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'
+    ];
+    let eType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+    
+    // Reroll logic
+    if (['SKILL_UPGRADE', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'].includes(eType) && !gameState.playerSkill) {
+        eType = 'FREE_BUFF';
+    }
+    if (eType === 'TIME_LEAP' && gameState.floor < 3) {
+        eType = 'GOLD';
+    }
+
+    let title = 'Unknown Event';
+    let desc = '...';
+    let npcIcon = 'help-circle';
+    let npcColor = 'text-purple-400';
+    let options = [];
+
+    if (eType === 'GOLD') {
+        title = 'Lucky Encounter';
+        npcColor = 'text-amber-400';
+        npcIcon = 'coins';
+        desc = '隠された宝箱を見つけた！\nコインを獲得した。';
+        options.push({ text: 'Continue', icon: 'arrow-right', onClick: () => {
+            gameState.gold += Math.floor(Math.random() * 20) + 15;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+            closeEvent();
+        }, colorClass: 'bg-amber-900 text-amber-200 border-amber-600 hover:bg-amber-800' });
+    } else if (eType === 'MEGA_GOLD') {
+        title = 'Treasure Hoard';
+        npcColor = 'text-amber-300';
+        npcIcon = 'gem';
+        desc = 'まばゆく光る大量の金貨の山を発見した！';
+        options.push({ text: 'Take all', icon: 'coins', onClick: () => {
+            gameState.gold += Math.floor(Math.random() * 51) + 50;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+            closeEvent();
+        }, colorClass: 'bg-amber-900 text-amber-200 border-amber-600 hover:bg-amber-800' });
+    } else if (eType === 'TRAP') {
+        title = 'Ambush!';
+        npcColor = 'text-rose-500';
+        npcIcon = 'alert-triangle';
+        desc = '罠にかかってしまった！HPにダメージを受けた。';
+        options.push({ text: 'Ouch...', icon: 'skull', onClick: () => {
+            gameState.pHP = Math.max(1, gameState.pHP - 10);
+            gameState.player.hp = gameState.pHP;
+            updateHP();
+            closeEvent();
+        }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
+    } else if (eType === 'FREE_BUFF') {
+        title = 'Blessing';
+        npcColor = 'text-sky-400';
+        npcIcon = 'sparkles';
+        const merit = ITEM_EFFECTS.MERITS[Math.floor(Math.random() * ITEM_EFFECTS.MERITS.length)];
+        const val = merit.valueRange[0] + Math.floor(Math.random() * (merit.valueRange[1] - merit.valueRange[0] + 1));
+        desc = `不思議な光があなたを包み込む...\n\n${merit.text.replace('$V', val)}`;
+        options.push({ text: 'Accept', icon: 'check', onClick: () => {
+            merit.apply(gameState.pChar, val);
+            updateStatusDisplay();
+            closeEvent();
+        }, colorClass: 'bg-sky-900 text-sky-200 border-sky-600 hover:bg-sky-800' });
+    } else if (eType === 'TRIAL') {
+        title = 'Dark Trial';
+        npcColor = 'text-purple-500';
+        npcIcon = 'ghost';
+        desc = '「試練を受けよ...」\nHPの最大値が10減るが、攻撃力が5上がる。';
+        options.push({ text: 'Accept', icon: 'sword', onClick: () => {
+            gameState.pChar.hp = Math.max(1, gameState.pChar.hp - 10);
+            gameState.pHP = Math.min(gameState.pHP, gameState.pChar.hp);
+            gameState.pChar.atk += 5;
+            updateHP();
+            updateStatusDisplay();
+            closeEvent();
+        }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
+        options.push({ text: 'Refuse', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'MINI_BOSS') {
+        title = 'Fierce Monster';
+        npcColor = 'text-red-500';
+        npcIcon = 'flame';
+        desc = '凶暴な魔物が立ち塞がっている！\n倒せば多額の報酬が得られそうだ。';
+        options.push({ text: 'Fight', icon: 'swords', onClick: () => {
+            closeEventScreen();
+            startBattle(true); // force elite
+        }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
+        options.push({ text: 'Flee', icon: 'footprints', onClick: () => closeEvent() });
+    } else if (eType === 'EXTRA_LIFE') {
+        title = 'Fountain of Life';
+        npcColor = 'text-pink-400';
+        npcIcon = 'heart';
+        desc = '清らかな泉が湧き出ている。飲むとHPが最大まで回復し、最大HPも増えそうだ。';
+        options.push({ text: 'Drink', icon: 'droplet', onClick: () => {
+            gameState.pChar.hp += 10;
+            gameState.pHP = gameState.pChar.hp;
+            updateHP();
+            updateStatusDisplay();
+            closeEvent();
+        }, colorClass: 'bg-pink-900 text-pink-200 border-pink-600 hover:bg-pink-800' });
+        options.push({ text: 'Leave it', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'SKILL_DROP') {
+        title = 'Forgotten Tome';
+        npcColor = 'text-indigo-400';
+        npcIcon = 'book-open';
+        const skill = SKILLS[Math.floor(Math.random() * SKILLS.length)];
+        let sdesc = skill.description;
+        skill.effectValues.forEach(v => sdesc = sdesc.replace('?', v));
+        desc = `古い魔導書を見つけた。\n現在のスキルを忘れ、「${skill.name}」を習得する。\n\n【効果】 ${sdesc} (コスト: ${skill.cost})`;
+        options.push({ text: 'Learn', icon: 'book', onClick: () => {
+            gameState.playerSkill = skill;
+            gameState.pChar.skillCostBonus = 0;
+            gameState.pChar.skillEffectBonus = 0;
+            closeEvent();
+        }, colorClass: 'bg-indigo-900 text-indigo-200 border-indigo-600 hover:bg-indigo-800' });
+        options.push({ text: 'Leave it', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'SKILL_UPGRADE') {
+        title = 'Skill Master';
+        npcColor = 'text-blue-400';
+        npcIcon = 'graduation-cap';
+        desc = '熟練の魔導士がいる。\n「君のスキル、少しだけ改良してあげよう」';
+        options.push({ text: 'Accept', icon: 'wrench', onClick: () => {
+            gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+            closeEvent();
+        }, colorClass: 'bg-blue-900 text-blue-200 border-blue-600 hover:bg-blue-800' });
+        options.push({ text: 'Refuse', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'PAY_SKILL_UPGRADE') {
+        title = 'Mystic Blacksmith';
+        npcColor = 'text-orange-400';
+        npcIcon = 'hammer';
+        desc = `「コインを払えば、アンタのスキル『${gameState.playerSkill.name}』を強化してやるよ」`;
+        const currentCost = Math.max(0, gameState.playerSkill.cost + (gameState.pChar.skillCostBonus || 0));
+        if (currentCost > 0) {
+            options.push({ text: 'Cost Down', icon: 'arrow-down', disabled: gameState.gold < 50, onClick: () => {
+                gameState.gold -= 50;
+                document.getElementById('player-gold-val').innerText = gameState.gold;
+                gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+                closeEvent();
+            }, colorClass: 'bg-orange-900 text-orange-200 border-orange-600 hover:bg-orange-800' });
+        }
+        options.push({ text: 'Effect Boost', icon: 'arrow-up', disabled: gameState.gold < 30, onClick: () => {
+            gameState.gold -= 30;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+            gameState.pChar.skillEffectBonus = (gameState.pChar.skillEffectBonus || 0) + 1;
+            closeEvent();
+        }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
+        options.push({ text: 'Leave', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'SKILL_SELL') {
+        title = 'Skill Merchant';
+        npcColor = 'text-emerald-400';
+        npcIcon = 'shopping-bag';
+        desc = `「君のスキル『${gameState.playerSkill.name}』、なかなか良いものだ。60Gで買い取らせてくれないか？」\n（スキルを失います）`;
+        options.push({ text: 'Sell (60G)', icon: 'coins', onClick: () => {
+            gameState.gold += 60;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+            gameState.playerSkill = null;
+            gameState.pChar.skillCostBonus = 0;
+            gameState.pChar.skillEffectBonus = 0;
+            closeEvent();
+        }, colorClass: 'bg-emerald-900 text-emerald-200 border-emerald-600 hover:bg-emerald-800' });
+        options.push({ text: 'Refuse', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'HIDDEN_TREASURE') {
+        title = 'Hidden Room';
+        npcColor = 'text-yellow-400';
+        npcIcon = 'key';
+        desc = '隠し部屋を見つけた！どうやら宝箱があるようだ。';
+        options.push({ text: 'Open Chest', icon: 'package', onClick: () => {
+            closeEventScreen();
+            showTreasure();
+        }, colorClass: 'bg-yellow-900 text-yellow-200 border-yellow-600 hover:bg-yellow-800' });
+        options.push({ text: 'Leave', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'DISCOUNT_SHOP') {
+        title = 'Black Market';
+        npcColor = 'text-purple-400';
+        npcIcon = 'store';
+        desc = '怪しげな商人を見つけた。「良い品を安く売るぜ...」';
+        options.push({ text: 'Trade', icon: 'shopping-cart', onClick: () => {
+            closeEventScreen();
+            showShop(true);
+        }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
+        options.push({ text: 'Leave', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'WEAK_ENEMY') {
+        title = 'Sleeping Goblin';
+        npcColor = 'text-lime-500';
+        npcIcon = 'moon';
+        desc = 'ゴブリンが居眠りをしている。';
+        options.push({ text: 'Sneak Attack', icon: 'sword', onClick: () => {
+            closeEventScreen();
+            gameState.nextBattleEffects = [{ type: 'DMG_REDUCE', amount: 999, turns: 1 }];
+            startBattle();
+        }, colorClass: 'bg-lime-900 text-lime-200 border-lime-600 hover:bg-lime-800' });
+        options.push({ text: 'Ignore', icon: 'footprints', onClick: () => closeEvent() });
+    } else if (eType === 'INVINCIBLE_BUFF') {
+        title = 'Aegis Blessing';
+        npcColor = 'text-sky-300';
+        npcIcon = 'shield';
+        desc = '女神の加護を得た！\n次の戦闘で開始から3ターンの間、受けるダメージを軽減する。';
+        options.push({ text: 'Accept', icon: 'check', onClick: () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'DMG_REDUCE', amount: 999, turns: 3 });
+            closeEvent();
+        }, colorClass: 'bg-sky-900 text-sky-200 border-sky-600 hover:bg-sky-800' });
+    } else if (eType === 'ATK_BOOST_BUFF') {
+        title = 'Warrior\'s Blood';
+        npcColor = 'text-rose-400';
+        npcIcon = 'swords';
+        desc = '戦士の血が滾る！\n次の戦闘で開始から3ターンの間、攻撃力(ATK)が現在の2倍になる。';
+        options.push({ text: 'Accept', icon: 'check', onClick: () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'ATK_UP', amount: gameState.pChar.atk, turns: 3 });
+            closeEvent();
+        }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
+    } else if (eType === 'CHG_BOOST_BUFF') {
+        title = 'Mage\'s Insight';
+        npcColor = 'text-purple-400';
+        npcIcon = 'zap';
+        desc = '魔導の真理を垣間見た！\n次の戦闘で開始から3ターンの間、チャージ効率が2倍になる。';
+        options.push({ text: 'Accept', icon: 'check', onClick: () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'CHGE_UP', amount: gameState.pChar.chgE, turns: 3 });
+            closeEvent();
+        }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
+    } else if (eType === 'ELITE_WARNING') {
+        title = 'Ominous Presence';
+        npcColor = 'text-red-600';
+        npcIcon = 'skull';
+        desc = '恐ろしい気配を感じる... この先には強敵が待ち構えているだろう。';
+        options.push({ text: 'Prepare', icon: 'shield', onClick: () => {
+            if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+            gameState.nextBattleEffects.push({ type: 'DMG_REDUCE', amount: 20, turns: 2 });
+            closeEvent();
+        }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
+    } else if (eType === 'TIME_LEAP') {
+        title = 'Time Distortion';
+        npcColor = 'text-cyan-400';
+        npcIcon = 'clock';
+        desc = '時空の歪みを発見した。これを使えば少し前に戻れるかもしれない。';
+        options.push({ text: 'Leap (-2 Floors)', icon: 'rewind', onClick: () => {
+            gameState.floor = Math.max(1, gameState.floor - 2);
+            closeEvent();
+        }, colorClass: 'bg-cyan-900 text-cyan-200 border-cyan-600 hover:bg-cyan-800' });
+        options.push({ text: 'Ignore', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'WEAK_BOSS') {
+        title = 'Injured Beast';
+        npcColor = 'text-rose-300';
+        npcIcon = 'bug';
+        desc = '手負いの魔物がいる。弱っているようだが...';
+        options.push({ text: 'Attack', icon: 'sword', onClick: () => {
+            closeEventScreen();
+            startBattle(true);
+            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id);
+            gameState.cChar.hp = Math.max(1, Math.floor(baseChar.hp / 2));
+            gameState.cChar.atk = Math.max(1, Math.floor(baseChar.atk / 2));
+            updateHP(true);
+            updateStatusDisplay();
+        }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
+        options.push({ text: 'Leave', icon: 'footprints', onClick: () => closeEvent() });
+    } else if (eType === 'STRONG_BOSS') {
+        title = 'Enraged Beast';
+        npcColor = 'text-red-700';
+        npcIcon = 'flame';
+        desc = '怒り狂う強大な魔物がいる！倒せば莫大な報酬が手に入るだろう。';
+        options.push({ text: 'Challenge', icon: 'swords', onClick: () => {
+            closeEventScreen();
+            startBattle(true);
+            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id);
+            gameState.cChar.hp = Math.floor(baseChar.hp * 1.5);
+            gameState.cChar.atk = Math.floor(baseChar.atk * 1.5);
+            gameState.cHP = gameState.cChar.hp;
+            gameState.nextBattleEffects = [{ type: 'REWARD_UP', amount: 3, turns: 99 }];
+            updateHP(true);
+            updateStatusDisplay();
+        }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
+        options.push({ text: 'Flee', icon: 'footprints', onClick: () => closeEvent() });
+    } else if (eType === 'CURSED_TREASURE') {
+        title = 'Cursed Chest';
+        npcColor = 'text-purple-600';
+        npcIcon = 'package-x';
+        desc = '禍々しいオーラを放つ宝箱がある。\n開けると強力な呪いを受けるが、中身は期待できそうだ。';
+        options.push({ text: 'Open (-15 HP)', icon: 'key', onClick: () => {
+            gameState.pHP = Math.max(1, gameState.pHP - 15);
+            gameState.player.hp = gameState.pHP;
+            updateHP();
+            closeEventScreen();
+            showTreasure(true);
+        }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
+        options.push({ text: 'Leave it', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'LEGEND_TREASURE') {
+        title = 'Legendary Shrine';
+        npcColor = 'text-amber-500';
+        npcIcon = 'crown';
+        const legends = SKILLS.filter(s => s.rarity === 'LEGENDARY');
+        const skill = legends[Math.floor(Math.random() * legends.length)];
+        let sdesc = skill.description;
+        skill.effectValues.forEach(v => sdesc = sdesc.replace('?', v));
+        desc = `黄金に輝く祠がある。\n伝説のスキル「${skill.name}」を習得できる。\n（現在のスキルは上書きされます）\n\n【効果】 ${sdesc} (コスト: ${skill.cost})`;
+        options.push({ text: 'Learn', icon: 'star', onClick: () => {
+            gameState.playerSkill = skill;
+            closeEvent();
+        }, colorClass: 'bg-amber-900 text-amber-200 border-amber-600 hover:bg-amber-800' });
+        options.push({ text: 'Leave', icon: 'x', onClick: () => closeEvent() });
+    } else if (eType === 'STATUE_GREET') {
+        title = 'Mysterious Statue';
+        npcColor = 'text-slate-400';
+        npcIcon = 'castle';
+        desc = '古びた石像がぽつんと置かれている。';
+        options.push({ text: 'Touch', icon: 'hand', onClick: () => {
+            setupEventScreen('Mysterious Statue', '「こんにちは」\n\n石像が喋った！…が、それ以外は何も起こらなかった。', 'castle', 'text-slate-400', [
+                { text: '...', icon: 'more-horizontal', onClick: () => closeEvent() }
+            ]);
+        } });
+    } else if (eType === 'STATUE_BLESSING') {
+        title = 'Miracle Statue';
+        npcColor = 'text-yellow-300';
+        npcIcon = 'sun';
+        desc = '神々しいオーラを放つ石像が置かれている。';
+        options.push({ text: 'Touch', icon: 'hand', onClick: () => {
+            setupEventScreen('Miracle Statue', '「こんにちは、今日はいい日だね」\n\n石像が喋ると同時に、身体に強大な力がみなぎってきた！\n（次の戦闘で最初の3ターン：ダメージ無効化＆ATK2倍＆ChgE2倍）', 'sun', 'text-yellow-300', [
+                { text: 'Receive', icon: 'check', onClick: () => {
+                    if (!gameState.nextBattleEffects) gameState.nextBattleEffects = [];
+                    gameState.nextBattleEffects.push({ type: 'DMG_REDUCE', amount: 999, turns: 3 });
+                    gameState.nextBattleEffects.push({ type: 'ATK_UP', amount: gameState.pChar.atk, turns: 3 });
+                    gameState.nextBattleEffects.push({ type: 'CHGE_UP', amount: gameState.pChar.chgE, turns: 3 });
+                    closeEvent();
+                }, colorClass: 'bg-yellow-900 text-yellow-200 border-yellow-600 hover:bg-yellow-800' }
+            ]);
+        } });
+    } else {
+        // Fallback for unhandled event
+        options.push({ text: 'Close', onClick: () => closeEvent() });
+    }
+
+    setupEventScreen(title, desc, npcIcon, npcColor, options);
+}
+
+export function handleTreasureRoom() {
+    setupEventScreen('Treasure Room', '豪華な宝箱が置かれている。\n開けてみるか？', 'package', 'text-yellow-400', [
+        { text: 'Open', icon: 'key', onClick: () => {
+            closeEventScreen();
+            showTreasure();
+        }, colorClass: 'bg-yellow-900 text-yellow-200 border-yellow-600 hover:bg-yellow-800' },
+        { text: 'Leave', icon: 'footprints', onClick: () => {
+            closeEventScreen();
+            showMap();
+        } }
+    ]);
+}
+
+export function handleShopRoom(isDiscount = false) {
+    if (isDiscount) {
+        setupEventScreen('Black Market', '怪しい商人がこちらを見ている。\n「良い品を安く売るぜ...」', 'store', 'text-purple-400', [
+            { text: 'Trade', icon: 'shopping-cart', onClick: () => {
+                closeEventScreen();
+                showShop(true);
+            }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' },
+            { text: 'Leave', icon: 'footprints', onClick: () => {
+                closeEventScreen();
+                showMap();
+            } }
+        ]);
+    } else {
+        setupEventScreen('Merchant', '商人がこちらを見ている。\n「なにか買っていくかい？」', 'store', 'text-blue-400', [
+            { text: 'Look', icon: 'shopping-cart', onClick: () => {
+                closeEventScreen();
+                showShop(false);
+            }, colorClass: 'bg-blue-900 text-blue-200 border-blue-600 hover:bg-blue-800' },
+            { text: 'Leave', icon: 'footprints', onClick: () => {
+                closeEventScreen();
+                showMap();
+            } }
+        ]);
+    }
+}
+export function showTreasure(forceSkillPhase = false) {
+    const cardsContainer = document.getElementById('event-items-container');
+    const isMimic = (gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST');
+    const isBoss = (gameState.floor % 5 === 0);
+    const options = generateTreasureOptions(isMimic, isBoss, forceSkillPhase);
+    
+    // Clear and Show
+    cardsContainer.innerHTML = '';
+    cardsContainer.classList.remove('hidden');
+
+    // Title / Desc if needed, but since it's in main view, we can add a header inside container
+    const header = document.createElement('div');
+    header.className = 'w-full text-center mb-6 mt-4';
+    if (forceSkillPhase) {
+        header.innerHTML = '<h2 class="text-3xl font-black font-orbitron italic tracking-widest uppercase mb-1 drop-shadow-md text-amber-400">Ultimate Skill Unlocked</h2><p class="text-white font-bold text-sm leading-tight drop-shadow-md">BOSS REWARD: CHOOSE A HIGH-RANK SKILL</p>';
+    } else {
+        header.innerHTML = '<h2 class="text-3xl font-black font-orbitron italic tracking-widest uppercase mb-1 drop-shadow-md text-amber-400">Choose Your Reward</h2><p class="text-white font-bold text-sm leading-tight drop-shadow-md">Select one of three options</p>';
+    }
+    cardsContainer.appendChild(header);
+
+    // Cards wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'w-full flex flex-col md:flex-row items-center justify-center gap-4 px-4';
+    cardsContainer.appendChild(wrapper);
+
+    options.forEach(option => {
+        const card = document.createElement('div');
+        let title, description, icon, borderColor = 'border-slate-600', textColor = 'text-white', iconColor = 'text-amber-400';
+        if (option.type === 'skill') {
+            const skill = option.skill;
+            title = `新スキル: ${skill.name}`;
+            description = `${skill.description} (コスト: ${skill.cost})`;
+            icon = 'star';
+
+            switch (skill.rarity) {
+                case 'COMMON':
+                    borderColor = 'border-slate-500';
+                    textColor = 'text-slate-300';
+                    iconColor = 'text-slate-400';
+                    break;
+                case 'RARE':
+                    borderColor = 'border-blue-500';
+                    textColor = 'text-blue-300';
+                    iconColor = 'text-blue-400';
+                    title += ' <span class="text-[10px] bg-blue-900/50 text-blue-300 px-1 rounded border border-blue-500/50 align-middle">RARE</span>';
+                    break;
+                case 'EPIC':
+                    borderColor = 'border-purple-500';
+                    textColor = 'text-purple-300';
+                    iconColor = 'text-purple-400';
+                    title += ' <span class="text-[10px] bg-purple-900/50 text-purple-300 px-1 rounded border border-purple-500/50 align-middle">EPIC</span>';
+                    break;
+                case 'LEGENDARY':
+                    borderColor = 'border-amber-500';
+                    textColor = 'text-amber-300';
+                    iconColor = 'text-amber-400';
+                    title += ' <span class="text-[10px] bg-amber-900/50 text-amber-300 px-1 rounded border border-amber-500/50 align-middle">LEGENDARY</span>';
+                    break;
+            }
+
+        } else {
+            title = '強化アイテム';
+            if (option.demerit) {
+                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span><span class="text-rose-500 block mt-2">- ${option.demerit.text.replace('$V', option.demerit.value)}</span>`;
+            } else {
+                description = `<span class="text-emerald-400 block">+ ${option.merit.text.replace('$V', option.merit.value)}</span>`;
+            }
+            icon = 'gem';
+        }
+
+        card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95`;
+        card.innerHTML = `
+            <div class="flex-shrink-0 mt-2">
+                <i data-lucide="${icon}" class="w-12 h-12 ${iconColor}"></i>
+            </div>
+            <div class="flex-1 w-full flex flex-col justify-between">
+                <h3 class="font-orbitron font-bold text-sm mb-2 ${textColor} leading-tight">${title}</h3>
+                <div class="text-xs text-slate-400 font-bold leading-relaxed">${option.description || description}</div>
+            </div>
+        `;
+        card.onclick = () => {
+            if (window.sound) window.sound.playSE('click');
+            cardsContainer.classList.add('hidden');
+            selectTreasure(option, forceSkillPhase);
+        };
+        wrapper.appendChild(card);
+    });
+
+    if (!forceSkillPhase) {
+        // Add Skip Button
+        const skipCard = document.createElement('div');
+        skipCard.className = 'w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
+        skipCard.innerHTML = `
+            <div class="flex-shrink-0 mt-2">
+                <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
+            </div>
+            <div class="flex-1 w-full flex flex-col justify-center">
+                <h3 class="font-orbitron font-bold text-sm mb-2 text-white">SKIP</h3>
+                <div class="text-xs text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
+            </div>
+        `;
+        skipCard.onclick = () => {
+            if (window.sound) window.sound.playSE('click');
+            cardsContainer.classList.add('hidden');
+            selectTreasure({ type: 'skip' }, false);
+        };
+        wrapper.appendChild(skipCard);
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+}
+export function showShop(isDiscount = false) {
+    const cardsContainer = document.getElementById('event-items-container');
+    
+    // Clear and Show
+    cardsContainer.innerHTML = '';
+    cardsContainer.classList.remove('hidden');
+    
+    // Title
+    const header = document.createElement('div');
+    header.className = 'w-full text-center mb-6 mt-4';
+    if (isDiscount) {
+        header.innerHTML = '<h2 class="text-3xl font-black font-orbitron italic tracking-widest uppercase mb-1 drop-shadow-md text-purple-400">Black Market</h2><p class="text-white font-bold text-sm leading-tight drop-shadow-md">所持金: <span id="event-shop-gold" class="text-yellow-400">' + gameState.gold + '</span> G</p>';
+    } else {
+        header.innerHTML = '<h2 class="text-3xl font-black font-orbitron italic tracking-widest uppercase mb-1 drop-shadow-md text-sky-400">Merchant</h2><p class="text-white font-bold text-sm leading-tight drop-shadow-md">所持金: <span id="event-shop-gold" class="text-yellow-400">' + gameState.gold + '</span> G</p>';
+    }
+    cardsContainer.appendChild(header);
+
+    // Cards wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'w-full flex flex-col md:flex-row items-center justify-center gap-4 px-4';
+    cardsContainer.appendChild(wrapper);
+
+    // Generate 3 random items
+    const shopItems = [];
+    shopItems.push({
+        id: 'heal',
+        name: 'HP Potion',
+        desc: 'Restores 30 HP',
+        cost: isDiscount ? 10 : 20,
+        icon: 'heart',
+        action: () => {
+            gameState.pHP = Math.min(gameState.pChar.hp, gameState.pHP + 30);
+            gameState.player.hp = gameState.pHP;
+        }
+    });
+    
+    for(let i=0; i<2; i++) {
+        const merit = ITEM_EFFECTS.MERITS[Math.floor(Math.random() * ITEM_EFFECTS.MERITS.length)];
+        const val = merit.valueRange[0] + Math.floor(Math.random() * (merit.valueRange[1] - merit.valueRange[0] + 1));
+        let baseCost = val * 5 + 10;
+        if (isDiscount) baseCost = Math.floor(baseCost / 2);
+        
+        shopItems.push({
+            id: merit.id,
+            name: 'Enhancement',
+            desc: `+ ${merit.text.replace('$V', val)}`,
+            cost: baseCost,
+            icon: 'gem',
+            action: () => {
+                merit.apply(gameState.pChar, val);
+            }
+        });
+    }
+
+    shopItems.forEach(item => {
+        const card = document.createElement('div');
+        const canAfford = gameState.gold >= item.cost;
+        
+        let borderColor = canAfford ? (isDiscount ? 'border-purple-500' : 'border-sky-500') : 'border-slate-700';
+        let iconColor = canAfford ? (isDiscount ? 'text-purple-400' : 'text-sky-400') : 'text-slate-500';
+        let cursorClass = canAfford ? 'cursor-pointer hover:bg-slate-800 hover:scale-[1.05] active:scale-95 group' : 'opacity-50 cursor-not-allowed';
+        
+        card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 ${cursorClass}`;
+        
+        card.innerHTML = `
+            <div class="flex-shrink-0 mt-2">
+                <i data-lucide="${item.icon}" class="w-12 h-12 ${iconColor}"></i>
+            </div>
+            <div class="flex-1 w-full flex flex-col justify-between">
+                <h3 class="font-orbitron font-bold text-sm mb-2 text-white leading-tight">${item.name}</h3>
+                <div class="text-xs text-slate-400 font-bold leading-relaxed mb-2">${item.desc}</div>
+                <div class="font-orbitron font-black text-amber-400 text-lg">${item.cost} G</div>
+            </div>
+        `;
+        
+        if (canAfford) {
+            card.onclick = () => {
+                if (window.sound) window.sound.playSE('click');
+                gameState.gold -= item.cost;
+                document.getElementById('player-gold-val').innerText = gameState.gold;
+                document.getElementById('event-shop-gold').innerText = gameState.gold;
+                item.action();
+                updateHP();
+                updateStatusDisplay();
+                // 一度買ったら売り切れ（またはボタン無効化）
+                card.onclick = null;
+                card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 border-slate-700 p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 opacity-50 cursor-not-allowed`;
+                card.querySelector('i').className = `w-12 h-12 text-slate-500`;
+                
+                // 他のボタンも所持金不足になってないかチェックして更新する処理が必要だが、
+                // 簡単のため、購入後はそのままショップを続けるか、または立ち去るボタンだけを残す
+            };
+        }
+        wrapper.appendChild(card);
+    });
+
+    // Add Leave Button
+    const skipCard = document.createElement('div');
+    skipCard.className = 'w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
+    skipCard.innerHTML = `
+        <div class="flex-shrink-0 mt-2">
+            <i data-lucide="footprints" class="w-12 h-12 text-slate-400"></i>
+        </div>
+        <div class="flex-1 w-full flex flex-col justify-center">
+            <h3 class="font-orbitron font-bold text-sm mb-2 text-white">LEAVE</h3>
+            <div class="text-xs text-slate-500 font-bold uppercase">店を出る</div>
+        </div>
+    `;
+    skipCard.onclick = () => {
+        if (window.sound) window.sound.playSE('click');
+        cardsContainer.classList.add('hidden');
+        showMap();
+    };
+    wrapper.appendChild(skipCard);
+
+    if (window.lucide) window.lucide.createIcons();
 }
