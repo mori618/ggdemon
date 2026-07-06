@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/peerjs@1.5.0/dist/peerjs.min.js"></script>
     
-  <script type="module" crossorigin src="./assets/index-90215b0a.js"></script>
+  <script type="module" crossorigin src="./assets/index-57fce931.js"></script>
   <link rel="stylesheet" href="./assets/index-4d3e42d6.css">
 </head>
 
@@ -298,9 +298,10 @@
             <h1
                 class="text-xs font-black font-orbitron bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent uppercase tracking-wider">
                 G.G Demon</h1>
-            <div id="tower-indicator" class="hidden mt-1"><span
-                    class="streak-badge text-[10px] font-orbitron uppercase tracking-widest text-white">FLOOR <span
-                        id="current-floor-val">1</span> / BOSS IN <span id="boss-in-val">10</span></span></div>
+            <div id="tower-indicator" class="hidden mt-1 flex gap-2">
+                <span class="streak-badge text-[10px] font-orbitron uppercase tracking-widest text-white">FLOOR <span id="current-floor-val">1</span> / BOSS IN <span id="boss-in-val">10</span></span>
+                <span class="streak-badge text-[10px] font-orbitron uppercase tracking-widest text-amber-400 flex items-center gap-1"><i data-lucide="coins" class="w-3 h-3"></i> <span id="player-gold-val">0</span></span>
+            </div>
         </div>
         <div class="flex gap-2">
             <button id="sound-btn" onclick="toggleMute()"
@@ -348,7 +349,7 @@
 
 
         <!-- CPU -->
-        <div class="flex flex-col items-center w-1/3">
+        <div id="enemy-area" class="flex flex-col items-center w-1/3">
             <div id="cpu-card" onclick="openStatusOverlay('CPU')"
                 class="char-card-clickable w-32 h-32 md:w-40 md:h-40 bg-rose-500/10 rounded-[2.5rem] border-4 border-rose-500/20 flex items-center justify-center shadow-2xl relative transition-all">
                 <div id="cpu-icon-container"></div>
@@ -374,6 +375,23 @@
             <div id="cpu-energy-bar" class="flex flex-wrap gap-1 justify-center max-w-[140px]"></div>
             <span id="cpu-name-label"
                 class="text-[10px] md:text-xs font-black text-rose-500/60 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">CPU</span>
+        </div>
+
+        <!-- イベント時のアイテム選択エリア -->
+        <div id="event-items-container" class="hidden absolute inset-0 z-30 flex items-center justify-center gap-4 bg-slate-950/90 backdrop-blur-md p-4 flex-wrap overflow-y-auto">
+            <!-- Items injected here -->
+        </div>
+
+        <!-- イベントNPC -->
+        <div id="event-npc-area" class="hidden flex flex-col items-center w-1/3">
+            <div id="event-npc-card"
+                class="w-32 h-32 md:w-40 md:h-40 bg-slate-800/50 rounded-[2.5rem] border-4 border-slate-700/50 flex items-center justify-center shadow-2xl relative transition-all">
+                <div id="event-npc-icon-container" class="text-white flex items-center justify-center">
+                    <!-- Icon injected here -->
+                </div>
+            </div>
+            <span id="event-npc-name-label"
+                class="text-[10px] md:text-xs font-black text-slate-500 tracking-[0.2em] mt-3 uppercase font-orbitron italic text-center">UNKNOWN</span>
         </div>
     </main>
 
@@ -411,6 +429,21 @@
 
             <div class="mt-2 font-orbitron text-[10px] font-black text-slate-700 tracking-[0.2em]">TURN <span
                     id="turn-display">1</span></div>
+        </div>
+
+        <!-- イベント用コマンド -->
+        <div id="event-command-wrapper" class="hidden">
+            <div id="event-message-container" class="mb-4 text-center px-4 min-h-[60px] flex flex-col justify-end">
+                <p id="event-ui-title" class="text-3xl font-black font-orbitron italic tracking-widest uppercase mb-1 drop-shadow-md"></p>
+                <p id="event-ui-desc" class="text-white font-bold text-sm leading-tight drop-shadow-md whitespace-pre-wrap"></p>
+            </div>
+            <!-- コマンドエリア -->
+            <div class="flex space-x-3 items-end mb-4 pt-2 justify-center" id="event-cmd-buttons">
+                <button id="event-cmd-0" class="command-btn hidden"><i data-lucide="help-circle" class="w-8 h-8"></i><span class="effect-label">OPT</span></button>
+                <button id="event-cmd-1" class="command-btn hidden"><i data-lucide="help-circle" class="w-8 h-8"></i><span class="effect-label">OPT</span></button>
+                <button id="event-cmd-2" class="command-btn hidden"><i data-lucide="help-circle" class="w-8 h-8"></i><span class="effect-label">OPT</span></button>
+                <button id="event-cmd-3" class="command-btn hidden"><i data-lucide="help-circle" class="w-8 h-8"></i><span class="effect-label">OPT</span></button>
+            </div>
         </div>
     </footer>
 
@@ -538,6 +571,54 @@
                     class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95 shadow-lg shadow-emerald-900/20">OK</button>
                 <button id="confirm-cancel-btn"
                     class="w-full bg-slate-800 text-slate-400 py-3 rounded-2xl font-black uppercase text-lg active:scale-95">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Overlay -->
+    <div id="map-overlay"
+        class="fixed inset-0 z-[140] flex flex-col items-center justify-start hidden bg-slate-950 text-white overflow-hidden">
+        <h2 class="text-3xl font-black italic font-orbitron mt-8 mb-4 uppercase tracking-widest text-sky-400">Tower Map</h2>
+        
+        <!-- Map visualization area -->
+        <div id="map-container" class="flex-grow w-full max-w-md relative overflow-y-auto overflow-x-hidden flex flex-col-reverse items-center justify-start pb-32 pt-8" style="scrollbar-width: none;">
+            <!-- Map nodes will be injected here -->
+        </div>
+
+        <!-- Next Room Choices (Command style) -->
+        <div class="w-full absolute bottom-0 bg-slate-900 border-t-2 border-slate-800 p-4 pt-6 rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+            <h3 class="text-center font-orbitron font-black text-slate-400 text-sm mb-4 uppercase tracking-widest">Select Next Room</h3>
+            <div id="map-choices-container" class="flex justify-center gap-4">
+                <!-- Choices injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Overlay -->
+    <div id="shop-overlay"
+        class="fixed inset-0 z-[160] overlay-bg flex-col items-center justify-start hidden opacity-0 transition-opacity duration-500 p-4 pt-12 pb-12 overflow-y-auto">
+        <div class="flex flex-col items-center text-center mb-8">
+            <i data-lucide="store" class="w-16 h-16 text-sky-400 drop-shadow-[0_0_15px_rgba(56,189,248,0.7)] mb-3"></i>
+            <h2 class="text-3xl font-black italic font-orbitron uppercase tracking-tighter text-white">Merchant</h2>
+            <p class="text-slate-400 font-bold text-sm uppercase flex items-center justify-center gap-1">
+                Your Gold: <span id="shop-gold-display" class="text-amber-400 font-orbitron ml-1">0</span> <i data-lucide="coins" class="w-4 h-4 text-amber-400"></i>
+            </p>
+        </div>
+        <div id="shop-items-container" class="flex flex-col gap-4 w-full max-w-md justify-center items-center mb-6">
+            <!-- Items injected here -->
+        </div>
+        <button onclick="leaveShop()" class="bg-slate-800 text-slate-300 py-4 px-12 rounded-xl font-black uppercase text-lg active:scale-95 hover:bg-slate-700 transition-all shadow-lg">Leave Shop</button>
+    </div>
+
+    <!-- Event Overlay -->
+    <div id="event-overlay"
+        class="fixed inset-0 z-[160] overlay-bg flex items-center justify-center hidden opacity-0 transition-opacity duration-500 p-4">
+        <div class="w-full max-w-md flex flex-col items-center p-8 bg-slate-900 border-4 border-slate-800 rounded-[2rem] shadow-2xl text-center text-white relative">
+            <i data-lucide="help-circle" class="w-16 h-16 text-purple-400 drop-shadow-[0_0_15px_rgba(192,132,252,0.7)] mb-4"></i>
+            <h2 id="event-title" class="text-3xl font-black italic font-orbitron mb-4 uppercase tracking-tighter text-purple-300">Unknown Event</h2>
+            <p id="event-description" class="text-slate-300 font-bold text-sm mb-8 leading-relaxed">...</p>
+            <div id="event-choices-container" class="flex flex-col gap-3 w-full">
+                <!-- Choices injected here -->
             </div>
         </div>
     </div>
