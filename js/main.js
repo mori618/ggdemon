@@ -426,7 +426,7 @@ function startTower(diff = 'NORMAL') {
     document.getElementById('tower-indicator').classList.remove('hidden');
     
     // マップの生成と表示
-    gameState.towerMap = generateTowerMap(5);
+    gameState.towerMap = generateTowerMap(7);
     gameState.currentMapNode = gameState.towerMap[0][0]; // START node
     
     showMap();

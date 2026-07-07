@@ -10,14 +10,14 @@ export function setupBattleState() {
     gameState.nextBattleEffects = []; // 一度使ったらクリア
     gameState.player.tempAtk = gameState.player.tempGrdC = gameState.player.tempChgE = gameState.player.tempChgC = gameState.player.tempDmgReduce = 0;
 
-    const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 5 === 0);
+    const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 7 === 0);
     let baseCpu;
 
     if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
         // Online: cChar is set via network sync
         baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
     } else if (gameState.gameMode === 'tower') {
-        const cyclePos = (gameState.floor - 1) % 5;
+        const cyclePos = (gameState.floor - 1) % 7;
         if (cyclePos === 0 && !isBoss && gameState.floor > 0) {
             gameState.treasureFloorOffset = Math.floor(Math.random() * 4);
         }
@@ -63,6 +63,18 @@ export function setupBattleState() {
             gameState.nextBattleIsElite = false; // フラグを消費
         }
 
+        // 弱い敵フラグの処理
+        if (gameState.nextBattleIsWeak) {
+            baseCpu.name = "Weak " + baseCpu.name;
+            baseCpu.hp = Math.max(1, Math.floor(baseCpu.hp * 0.6)); // HPを60%に
+            baseCpu.atk = Math.max(1, Math.floor(baseCpu.atk * 0.8)); // 攻撃力も少し下げる
+            // AIを優しくする
+            if (gameState.aiLevel === 'EXPERT') gameState.aiLevel = 'HARD';
+            else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'NORMAL';
+            else if (gameState.aiLevel === 'NORMAL') gameState.aiLevel = 'EASY';
+            gameState.nextBattleIsWeak = false;
+        }
+
         baseCpu.effects = []; // Initialize effects before passive
         if (baseCpu.passive) {
             baseCpu.passive.apply(baseCpu, gameState.player);
@@ -90,7 +102,7 @@ export function setupBattleState() {
 
     if (gameState.gameMode === 'tower') {
         document.getElementById('current-floor-val').innerText = gameState.floor;
-        const bossIn = 5 - ((gameState.floor - 1) % 5);
+        const bossIn = 7 - ((gameState.floor - 1) % 7);
         document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : bossIn;
 
         let badgeText = `FLOOR ${gameState.floor}`;
@@ -452,8 +464,43 @@ function showFinal(cpuEWin) {
     const towerStats = document.getElementById('tower-result-stats');
     if (gameState.gameMode === 'tower') {
         if (res === 'VICTORY') {
-            handleTowerVictory();
-            return; // 勝利時はresult-overlayを表示しない
+            towerStats?.classList.add('hidden');
+            
+            // ゴールドの獲得
+            let gainedGold = Math.floor(Math.random() * 11) + 10;
+            if (gameState.currentBossIsStrong) {
+                gainedGold += 100;
+                gameState.currentBossIsStrong = false;
+            }
+            gameState.gold += gainedGold;
+            document.getElementById('player-gold-val').innerText = gameState.gold;
+
+            desc.innerText = `${d}\n\n[ LOOT ]\n+${gainedGold} GOLD`;
+
+            retryB.innerText = 'Next / Proceed';
+            retryB.onclick = () => {
+                document.getElementById('result-overlay').classList.add('hidden');
+                showFloorClearAnim(() => {
+                    gameState.winStreak++;
+                    gameState.winsSinceChest++;
+                    if (gameState.currentMapNode && gameState.currentMapNode.type === 'ELITE') {
+                        showTreasure(false);
+                    } else if (gameState.currentMapNode && gameState.currentMapNode.type === 'BOSS') {
+                        showTreasure(false);
+                    } else {
+                        showMap();
+                    }
+                });
+            };
+            retryB.classList.remove('hidden');
+            retryB.classList.replace('bg-amber-600', 'bg-emerald-600');
+            retryB.classList.replace('hover:bg-amber-500', 'hover:bg-emerald-500');
+            retryB.classList.replace('shadow-amber-900/40', 'shadow-emerald-900/40');
+
+            lucide.createIcons();
+            ov.classList.remove('hidden');
+            setTimeout(() => ov.classList.add('opacity-100'), 10);
+            return;
         } else {
             // DEFEAT logic for Tower Mode
             towerStats?.classList.remove('hidden');
@@ -473,6 +520,13 @@ function showFinal(cpuEWin) {
                     bossList.appendChild(i);
                 });
             }
+
+            retryB.innerText = 'Retry Tower';
+            retryB.onclick = window.retryTower;
+            retryB.classList.remove('hidden');
+            retryB.classList.replace('bg-emerald-600', 'bg-amber-600');
+            retryB.classList.replace('hover:bg-emerald-500', 'hover:bg-amber-500');
+            retryB.classList.replace('shadow-emerald-900/40', 'shadow-amber-900/40');
 
             // Status
             const p = gameState.pChar;
@@ -517,32 +571,12 @@ function showFinal(cpuEWin) {
     setTimeout(() => ov.classList.add('opacity-100'), 10);
 }
 
-function handleTowerVictory() {
-    document.getElementById('result-overlay').classList.add('hidden');
-    // ゴールドの獲得
-    let gainedGold = Math.floor(Math.random() * 11) + 10;
-    
-    if (gameState.currentBossIsStrong) {
-        gainedGold += 100; // 強化ボスの場合は大量のゴールドを獲得
-        gameState.currentBossIsStrong = false; // フラグ消費
-    }
-    
-    gameState.gold += gainedGold;
-    document.getElementById('player-gold-val').innerText = gameState.gold;
-    
-    // showFloorClearAnim の後に宝箱ではなくマップへ
-    showFloorClearAnim(() => {
-        // 次の階層へ（マップ画面で選択した時点でfloorは進んでいるが、ここで念のため再同期）
-        gameState.winStreak++;
-        gameState.winsSinceChest++;
-        showMap();
-    });
-}
+
 
 function showFloorClearAnim(callback) {
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 z-[300] bg-slate-950/90 flex flex-col items-center justify-center animate-fade-in';
-    const nextIsBoss = ((gameState.floor + 1) % 5 === 0);
+    const nextIsBoss = ((gameState.floor + 1) % 7 === 0);
     const accentColor = nextIsBoss ? 'text-rose-500' : 'text-emerald-500';
 
     overlay.innerHTML = `
@@ -739,7 +773,7 @@ export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false
 export function selectTreasure(reward, fromForceSkillPhase = false) {
     sound.playSE('victory');
     const treasureOverlay = document.getElementById('treasure-overlay');
-    const isBoss = (gameState.floor % 5 === 0);
+    const isBoss = (gameState.floor % 7 === 0);
 
     if (reward.type === 'item') {
         reward.merit.apply(gameState.pChar, reward.merit.value);
@@ -768,7 +802,7 @@ export function selectTreasure(reward, fromForceSkillPhase = false) {
     }, 500);
 }
 
-export function generateTowerMap(totalFloors = 5) {
+export function generateTowerMap(totalFloors = 7) {
     const map = [];
     let currentId = 0;
 
@@ -785,37 +819,130 @@ export function generateTowerMap(totalFloors = 5) {
 
     // Floor 0 (Start)
     const startNode = createNode(0, 'START');
+    startNode.visited = true;
     map.push([startNode]);
 
     let prevLayer = [startNode];
+    let prevLayerHadShop = false;
+    let activeHiddenRouteNode = null;
 
     for (let f = 1; f < totalFloors; f++) {
-        const numNodes = Math.floor(Math.random() * 2) + 2; // 2 or 3 nodes
-        const currentLayer = [];
+        const numNodes = Math.floor(Math.random() * 2) + 3; // 3 or 4 normal nodes
+        const normalNodes = [];
+        let hasBattle = false;
+        let currentLayerHasShop = false;
 
         for (let i = 0; i < numNodes; i++) {
             let type = 'BATTLE';
             const r = Math.random();
-            if (f === totalFloors - 1) {
-                // Boss preceding floor: High chance of shop or treasure
-                if (r < 0.4) type = 'SHOP';
-                else if (r < 0.8) type = 'TREASURE';
-                else type = 'EVENT';
+            
+            if (f === 1) {
+                // Floor 1: Always weak enemies
+                type = 'WEAK_BATTLE';
+                hasBattle = true;
+            } else if (f === totalFloors - 1) {
+                // Boss preceding floor: ALWAYS SHOP
+                type = 'SHOP';
+                currentLayerHasShop = true;
             } else {
-                if (r < 0.5) type = 'BATTLE';
+                // Normal generation
+                if (r < 0.3) type = 'BATTLE';
+                else if (r < 0.4) {
+                    if (f >= 3) type = 'ELITE'; // Elites from floor 3
+                    else type = 'BATTLE';
+                }
                 else if (r < 0.65) type = 'TREASURE';
-                else if (r < 0.8) type = 'SHOP';
-                else type = 'EVENT';
+                else if (r < 0.80) {
+                    if (!prevLayerHadShop) {
+                        type = 'SHOP';
+                        currentLayerHasShop = true;
+                    } else {
+                        type = 'TREASURE';
+                    }
+                }
+                else if (r < 0.90) type = 'EVENT_SAFE';
+                else type = 'EVENT_RISK';
+                
+                if (type === 'BATTLE' || type === 'ELITE') {
+                    hasBattle = true;
+                }
             }
-            const node = createNode(f, type);
-            currentLayer.push(node);
+            normalNodes.push(createNode(f, type));
         }
 
-        // Connect prevLayer to currentLayer (ensure all are connected)
-        // Simple DAG generation
-        prevLayer.forEach(p => {
-            // connect to 1 or 2 nodes in current layer
-            let targets = [...currentLayer].sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 2) + 1);
+        // Ensure at least one battle room (if not boss-preceding floor and not floor 1 where they are already battles)
+        if (f !== 1 && f !== totalFloors - 1 && !hasBattle) {
+            const forceIdx = Math.floor(Math.random() * normalNodes.length);
+            if (normalNodes[forceIdx].type === 'SHOP') {
+                // Revert shop flag if we replaced the only shop
+                currentLayerHasShop = normalNodes.some((n, idx) => idx !== forceIdx && n.type === 'SHOP');
+            }
+            normalNodes[forceIdx].type = 'BATTLE';
+        }
+        
+        prevLayerHadShop = currentLayerHasShop;
+
+        const hiddenNodes = [];
+        let newActiveHiddenRouteNode = null;
+
+        if (activeHiddenRouteNode) {
+            // Continue route
+            const hiddenType = Math.random() < 0.8 ? 'TREASURE' : 'SHOP';
+            const hiddenNode = createNode(f, hiddenType);
+            hiddenNode.hidden = true;
+            hiddenNode.isRoute = true;
+            hiddenNodes.push(hiddenNode);
+            
+            // Connect to previous route node
+            activeHiddenRouteNode.children.push(hiddenNode.id);
+            hiddenNode.parents.push(activeHiddenRouteNode.id);
+            newActiveHiddenRouteNode = hiddenNode;
+        } else if (Math.random() < 0.20) {
+            // Start hidden room or route
+            const isRoute = Math.random() < 0.25 && f < totalFloors - 2; // only if room to grow
+            let hiddenType = 'TREASURE';
+            const hr = Math.random();
+            if (hr < 0.4) hiddenType = 'TREASURE';
+            else if (hr < 0.6) hiddenType = 'SHOP';
+            else if (hr < 0.8) hiddenType = 'ELITE';
+            else hiddenType = 'EVENT_RISK';
+            
+            const hiddenNode = createNode(f, hiddenType);
+            hiddenNode.hidden = true;
+            hiddenNode.isRoute = isRoute;
+            hiddenNodes.push(hiddenNode);
+            
+            // Connect from a random normal node from prevLayer
+            const availableParents = prevLayer.filter(n => !n.isRoute);
+            const p = availableParents[Math.floor(Math.random() * availableParents.length)] || prevLayer[0];
+            p.children.push(hiddenNode.id);
+            hiddenNode.parents.push(p.id);
+
+            if (isRoute) {
+                newActiveHiddenRouteNode = hiddenNode;
+            }
+        }
+
+        const currentLayer = [...normalNodes, ...hiddenNodes];
+
+        // Normal nodes from previous layer
+        const prevVisibleNodes = prevLayer.filter(n => !n.hidden);
+        
+        // Connect visible nodes to current normal nodes avoiding crossing
+        prevVisibleNodes.forEach((p, pIndex) => {
+            const relPos = pIndex / Math.max(1, prevVisibleNodes.length - 1);
+            
+            // Sort normalNodes by how close their relative position is to relPos
+            const sortedTargets = [...normalNodes].sort((a, b) => {
+                const aPos = normalNodes.indexOf(a) / Math.max(1, normalNodes.length - 1);
+                const bPos = normalNodes.indexOf(b) / Math.max(1, normalNodes.length - 1);
+                return Math.abs(aPos - relPos) - Math.abs(bPos - relPos);
+            });
+            
+            // Pick 2 or 3 closest (guarantees at least 2 choices)
+            const numChoices = Math.min(normalNodes.length, Math.floor(Math.random() * 2) + 2); // 2 or 3
+            const targets = sortedTargets.slice(0, numChoices);
+            
             targets.forEach(t => {
                 if (!p.children.includes(t.id)) {
                     p.children.push(t.id);
@@ -824,17 +951,39 @@ export function generateTowerMap(totalFloors = 5) {
             });
         });
 
-        // Ensure all current nodes have at least one parent
-        currentLayer.forEach(c => {
-            if (c.parents.length === 0) {
-                const p = prevLayer[Math.floor(Math.random() * prevLayer.length)];
-                p.children.push(c.id);
-                c.parents.push(p.id);
+        // Ensure all normalNodes have at least one VISIBLE parent
+        normalNodes.forEach(c => {
+            const hasVisibleParent = c.parents.some(pId => prevVisibleNodes.find(pn => pn.id === pId));
+            if (!hasVisibleParent) {
+                // Find closest visible parent
+                const cPos = normalNodes.indexOf(c) / Math.max(1, normalNodes.length - 1);
+                const sortedParents = [...prevVisibleNodes].sort((a, b) => {
+                    const aPos = prevVisibleNodes.indexOf(a) / Math.max(1, prevVisibleNodes.length - 1);
+                    const bPos = prevVisibleNodes.indexOf(b) / Math.max(1, prevVisibleNodes.length - 1);
+                    return Math.abs(aPos - cPos) - Math.abs(bPos - cPos);
+                });
+                const p = sortedParents[0] || prevVisibleNodes[0] || prevLayer[0];
+                if (!p.children.includes(c.id)) p.children.push(c.id);
+                if (!c.parents.includes(p.id)) c.parents.push(p.id);
             }
+        });
+
+        // Now handle hidden single nodes from prev layer
+        const prevHiddenSingleNodes = prevLayer.filter(n => n.hidden && !n.isRoute);
+        prevHiddenSingleNodes.forEach(p => {
+            // connect to 1 or 2 random normal nodes
+            let targets = [...normalNodes].sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 2) + 1);
+            targets.forEach(t => {
+                if (!p.children.includes(t.id)) {
+                    p.children.push(t.id);
+                    t.parents.push(p.id);
+                }
+            });
         });
 
         map.push(currentLayer);
         prevLayer = currentLayer;
+        activeHiddenRouteNode = newActiveHiddenRouteNode;
     }
 
     // Boss Floor
@@ -876,6 +1025,7 @@ function renderMapNodes(container) {
     svg.style.top = '0';
     svg.style.left = '0';
     svg.style.width = '100%';
+    // Height will be updated to match scrollHeight after nodes are added
     svg.style.height = '100%';
     svg.style.pointerEvents = 'none';
     svg.style.zIndex = '0';
@@ -900,13 +1050,28 @@ function renderMapNodes(container) {
             let bgClass = 'bg-slate-800 border-slate-700';
             
             if (node.type === 'START') { icon = 'flag'; colorClass = 'text-emerald-400'; }
+            else if (node.type === 'WEAK_BATTLE') { icon = 'sword'; colorClass = 'text-lime-400'; }
             else if (node.type === 'BATTLE') { icon = 'swords'; colorClass = 'text-rose-400'; }
             else if (node.type === 'ELITE') { icon = 'skull'; colorClass = 'text-rose-600'; }
             else if (node.type === 'TREASURE') { icon = 'gem'; colorClass = 'text-amber-400'; }
             else if (node.type === 'SHOP') { icon = 'store'; colorClass = 'text-sky-400'; }
-            else if (node.type === 'EVENT') { icon = 'help-circle'; colorClass = 'text-purple-400'; }
-            else if (node.type === 'BOSS') { icon = 'skull'; colorClass = 'text-rose-500'; bgClass = 'bg-slate-900 border-rose-900'; }
+            else if (node.type === 'EVENT_SAFE') { icon = 'help-circle'; colorClass = 'text-sky-300'; }
+            else if (node.type === 'EVENT_RISK') { icon = 'alert-triangle'; colorClass = 'text-rose-500'; }
+            else if (node.type === 'BOSS') { icon = 'skull'; colorClass = 'text-purple-500'; bgClass = 'bg-slate-800 animate-pulse border-purple-500/50 drop-shadow-[0_0_15px_rgba(168,85,247,0.5)] scale-125'; }
             
+            // Hidden logic
+            if (node.hidden) {
+                const isParentCurrent = gameState.currentMapNode && node.parents.includes(gameState.currentMapNode.id);
+                const isPastOrCurrent = gameState.currentFloorIndex >= node.floor;
+                if (!isParentCurrent && !isPastOrCurrent) {
+                    return; // skip rendering
+                }
+                // Special style for revealed hidden nodes
+                if (!isPastOrCurrent) {
+                    bgClass = 'bg-slate-800 border-amber-400 animate-pulse drop-shadow-[0_0_10px_rgba(251,191,36,0.8)]';
+                }
+            }
+
             if (isCurrent) {
                 bgClass = 'bg-slate-700 border-emerald-400 animate-pulse';
                 colorClass = 'text-emerald-400';
@@ -914,7 +1079,9 @@ function renderMapNodes(container) {
                 bgClass = 'bg-slate-900 border-slate-800';
                 colorClass = 'text-slate-600';
             } else if (isSelectable) {
-                bgClass = 'bg-slate-800 border-sky-400';
+                if (!node.hidden) {
+                    bgClass = 'bg-slate-800 border-sky-400';
+                }
             }
             
             nodeDiv.className = `w-12 h-12 rounded-full border-2 ${bgClass} flex justify-center items-center relative transition-all`;
@@ -931,19 +1098,21 @@ function renderMapNodes(container) {
     
     // Draw lines after layout is settled
     setTimeout(() => {
+        // Adjust SVG height to cover full scrollable area
+        svg.style.height = Math.max(container.scrollHeight, container.clientHeight) + 'px';
         const containerRect = container.getBoundingClientRect();
         
         Object.values(nodeElements).forEach(({ node, element }) => {
             const rect = element.getBoundingClientRect();
-            const x1 = rect.left - containerRect.left + rect.width / 2;
-            const y1 = rect.top - containerRect.top + rect.height / 2;
+            const x1 = rect.left - containerRect.left + container.scrollLeft + rect.width / 2;
+            const y1 = rect.top - containerRect.top + container.scrollTop + rect.height / 2;
             
             node.children.forEach(childId => {
                 if (nodeElements[childId]) {
                     const childElement = nodeElements[childId].element;
                     const childRect = childElement.getBoundingClientRect();
-                    const x2 = childRect.left - containerRect.left + childRect.width / 2;
-                    const y2 = childRect.top - containerRect.top + childRect.height / 2;
+                    const x2 = childRect.left - containerRect.left + container.scrollLeft + childRect.width / 2;
+                    const y2 = childRect.top - containerRect.top + container.scrollTop + childRect.height / 2;
                     
                     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     line.setAttribute('x1', x1);
@@ -952,17 +1121,34 @@ function renderMapNodes(container) {
                     line.setAttribute('y2', y2);
                     
                     // Style line based on if it's a taken path
-                    const isTakenPath = gameState.currentFloorIndex > node.floor && 
-                                        gameState.currentMapNode.floor >= nodeElements[childId].node.floor; // simplistic check
+                    const isTakenPath = node.visited && nodeElements[childId].node.visited;
                     
                     line.setAttribute('stroke', isTakenPath ? '#34d399' : '#334155');
                     line.setAttribute('stroke-width', '3');
                     line.setAttribute('stroke-dasharray', isTakenPath ? '0' : '5,5');
                     
-                    svg.appendChild(line);
+                    if (isTakenPath) {
+                        line.style.zIndex = '1';
+                        // Keep taken paths on top of un-taken ones
+                        svg.appendChild(line);
+                    } else {
+                        svg.insertBefore(line, svg.firstChild);
+                    }
                 }
             });
         });
+        
+        // Scroll to current node
+        if (gameState.currentMapNode && nodeElements[gameState.currentMapNode.id]) {
+            const currentElement = nodeElements[gameState.currentMapNode.id].element;
+            // Target scroll so the element is roughly in the center of the visible area
+            // We add + 150 to shift the view down (moving the element UP), avoiding the footer
+            const targetScrollTop = currentElement.offsetTop - (container.clientHeight / 2) + 150;
+            container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+        } else {
+            container.scrollTop = container.scrollHeight;
+        }
+        
         lucide.createIcons();
     }, 50);
 }
@@ -1002,16 +1188,36 @@ function renderMapChoices(container) {
             label = 'SHOP';
             bgClass = 'bg-sky-950/40 border-sky-900 text-sky-300 hover:bg-sky-900/60 hover:border-sky-700 hover:text-sky-100';
             iconColor = 'text-sky-400 group-hover:text-sky-200';
-        } else if (targetNode.type === 'EVENT') {
+        } else if (targetNode.type === 'EVENT_SAFE') {
             icon = 'help-circle';
             label = 'EVENT';
-            bgClass = 'bg-purple-950/40 border-purple-900 text-purple-300 hover:bg-purple-900/60 hover:border-purple-700 hover:text-purple-100';
-            iconColor = 'text-purple-400 group-hover:text-purple-200';
+            bgClass = 'bg-sky-950/40 border-sky-900 text-sky-300 hover:bg-sky-900/60 hover:border-sky-700 hover:text-sky-100';
+            iconColor = 'text-sky-400 group-hover:text-sky-200';
+        } else if (targetNode.type === 'EVENT_RISK') {
+            icon = 'alert-triangle';
+            label = 'EVENT';
+            bgClass = 'bg-rose-950/40 border-rose-900 text-rose-300 hover:bg-rose-900/60 hover:border-rose-700 hover:text-rose-100';
+            iconColor = 'text-rose-500 group-hover:text-rose-300';
+        } else if (targetNode.type === 'WEAK_BATTLE') {
+            icon = 'sword';
+            label = 'WEAK';
+            bgClass = 'bg-lime-950/40 border-lime-800 text-lime-200 hover:bg-lime-900/60 hover:border-lime-500 hover:text-white';
+            iconColor = 'text-lime-500 group-hover:text-lime-300';
+        } else if (targetNode.type === 'ELITE') {
+            icon = 'skull';
+            label = 'ELITE';
+            bgClass = 'bg-rose-950/40 border-rose-600 text-rose-200 hover:bg-rose-900/60 hover:border-rose-400 hover:text-white hover:shadow-[0_0_10px_rgba(225,29,72,0.5)]';
+            iconColor = 'text-rose-600 group-hover:text-rose-400';
         } else if (targetNode.type === 'BOSS') {
             icon = 'skull';
             label = 'BOSS';
             bgClass = 'bg-rose-950 border-rose-600 text-white hover:bg-rose-900 hover:border-rose-400 hover:shadow-[0_0_15px_rgba(225,29,72,0.5)]';
             iconColor = 'text-rose-400 group-hover:text-white';
+        }
+        
+        if (targetNode.hidden) {
+            bgClass += ' ring-2 ring-amber-400/80 ring-offset-2 ring-offset-slate-900 animate-pulse drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]';
+            label = 'HIDDEN';
         }
         
         btn.className = `command-btn group w-24 h-24 flex flex-col items-center justify-center border-2 rounded-2xl transition-all shadow-lg backdrop-blur-sm relative overflow-hidden active:scale-95 ${bgClass}`;
@@ -1031,6 +1237,7 @@ function renderMapChoices(container) {
 
 window.enterRoom = (node) => {
     sound.playSE('click');
+    node.visited = true;
     gameState.currentMapNode = node;
     gameState.currentFloorIndex = node.floor;
     gameState.floor = node.floor; // Sync with existing floor logic
@@ -1041,12 +1248,14 @@ window.enterRoom = (node) => {
     mapOverlay.classList.add('hidden');
     
     // Route to appropriate handler
-    if (node.type === 'BATTLE' || node.type === 'BOSS' || node.type === 'ELITE') {
+    if (node.type === 'BATTLE' || node.type === 'BOSS' || node.type === 'ELITE' || node.type === 'WEAK_BATTLE') {
         // Battle
         const deck = (node.type === 'BOSS') ? gameState.bossDeck : gameState.mobDeck;
         const charId = deck.draw();
         gameState.cChar = CHARACTERS.find(c => c.id === charId) || BOSS_CHARACTERS.find(c => c.id === charId);
         
+        gameState.nextBattleIsElite = (node.type === 'ELITE');
+        gameState.nextBattleIsWeak = (node.type === 'WEAK_BATTLE');
         setupBattleState();
     } else if (node.type === 'TREASURE') {
         // Treasure
@@ -1054,9 +1263,9 @@ window.enterRoom = (node) => {
     } else if (node.type === 'SHOP') {
         // Shop
         handleShopRoom();
-    } else if (node.type === 'EVENT') {
+    } else if (node.type === 'EVENT_SAFE' || node.type === 'EVENT_RISK') {
         // Event
-        showEvent();
+        showEvent(node.type);
     }
 };
 
@@ -1121,20 +1330,25 @@ export function closeEventScreen() {
     document.getElementById('event-command-wrapper').classList.add('hidden');
 }
 
-export function showEvent() {
+export function showEvent(nodeType = 'EVENT_SAFE') {
     // Helper to close event and proceed to map
     const closeEvent = () => {
         closeEventScreen();
         showMap();
     };
 
-    const eventTypes = [
-        'GOLD', 'TRAP', 'FREE_BUFF', 'TRIAL', 'MINI_BOSS', 'EXTRA_LIFE', 'SKILL_DROP',
-        'SKILL_UPGRADE', 'HIDDEN_TREASURE', 'DISCOUNT_SHOP', 'WEAK_ENEMY',
-        'INVINCIBLE_BUFF', 'ATK_BOOST_BUFF', 'CHG_BOOST_BUFF', 'ELITE_WARNING', 'TIME_LEAP',
-        'WEAK_BOSS', 'STRONG_BOSS', 'CURSED_TREASURE', 'LEGEND_TREASURE', 'STATUE_GREET', 'STATUE_BLESSING',
-        'MEGA_GOLD', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'
+    const safeEvents = [
+        'GOLD', 'FREE_BUFF', 'EXTRA_LIFE', 'SKILL_DROP', 'SKILL_UPGRADE', 
+        'HIDDEN_TREASURE', 'DISCOUNT_SHOP', 'WEAK_ENEMY', 'WEAK_BOSS', 
+        'LEGEND_TREASURE', 'STATUE_BLESSING', 'MEGA_GOLD'
     ];
+    
+    const riskEvents = [
+        'TRAP', 'TRIAL', 'MINI_BOSS', 'ELITE_WARNING', 'STRONG_BOSS', 
+        'CURSED_TREASURE', 'PAY_SKILL_UPGRADE', 'SKILL_SELL', 'TIME_LEAP', 'STATUE_GREET'
+    ];
+
+    const eventTypes = nodeType === 'EVENT_RISK' ? riskEvents : safeEvents;
     let eType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
     
     // Reroll logic
@@ -1506,7 +1720,7 @@ export function handleShopRoom(isDiscount = false) {
 export function showTreasure(forceSkillPhase = false) {
     const cardsContainer = document.getElementById('event-items-container');
     const isMimic = (gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST');
-    const isBoss = (gameState.floor % 5 === 0);
+    const isBoss = (gameState.floor % 7 === 0);
     const options = generateTreasureOptions(isMimic, isBoss, forceSkillPhase);
     
     // Clear and Show
