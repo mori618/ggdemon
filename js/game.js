@@ -485,19 +485,19 @@ function showFinal(cpuEWin) {
             retryB.innerText = 'Next / Proceed';
             retryB.onclick = () => {
                 document.getElementById('result-overlay').classList.add('hidden');
-                showFloorClearAnim(() => {
-                    gameState.winStreak++;
-                    gameState.winsSinceChest++;
-                    if (gameState.currentMapNode && gameState.currentMapNode.type === 'ELITE') {
-                        showTreasure(false);
-                    } else if (gameState.currentMapNode && gameState.currentMapNode.type === 'BOSS') {
-                        showTreasure(false);
-                    } else if (gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST') {
-                        showTreasure(false);
-                    } else {
+                gameState.winStreak++;
+                gameState.winsSinceChest++;
+                
+                const type = gameState.currentMapNode ? gameState.currentMapNode.type : null;
+                const isChest = gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST';
+                if (type === 'ELITE' || type === 'WEAK_BATTLE' || type === 'BOSS' || isChest) {
+                    gameState.pendingFloorClearAnim = true;
+                    showTreasure(false);
+                } else {
+                    showFloorClearAnim(() => {
                         showMap();
-                    }
-                });
+                    });
+                }
             };
             retryB.classList.remove('hidden');
             retryB.classList.replace('bg-amber-600', 'bg-emerald-600');
@@ -809,7 +809,14 @@ export function selectTreasure(reward, fromForceSkillPhase = false) {
     treasureOverlay.classList.remove('opacity-100');
     setTimeout(() => {
         treasureOverlay.classList.add('hidden');
-        showMap();
+        if (gameState.pendingFloorClearAnim) {
+            gameState.pendingFloorClearAnim = false;
+            showFloorClearAnim(() => {
+                showMap();
+            });
+        } else {
+            showMap();
+        }
     }, 500);
 }
 
@@ -1318,6 +1325,7 @@ window.enterRoom = (node) => {
 };
 
 export function setupEventScreen(title, desc, npcIcon, npcColor, options) {
+    updateUI();
     const battleArea = document.getElementById('enemy-area');
     const eventNpcArea = document.getElementById('event-npc-area');
     const commandWrapper = document.getElementById('command-wrapper');
@@ -1843,7 +1851,7 @@ export function showTreasure(forceSkillPhase = false) {
             icon = 'gem';
         }
 
-        card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95`;
+        card.className = `w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-800 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95`;
         card.innerHTML = `
             <div class="flex-shrink-0 mt-2">
                 <i data-lucide="${icon}" class="w-12 h-12 ${iconColor}"></i>
@@ -1863,7 +1871,7 @@ export function showTreasure(forceSkillPhase = false) {
 
     // Add Skip Button unconditionally
     const skipCard = document.createElement('div');
-    skipCard.className = 'w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
+    skipCard.className = 'w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
     skipCard.innerHTML = `
         <div class="flex-shrink-0 mt-2">
             <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
@@ -1944,7 +1952,7 @@ export function showShop(isDiscount = false) {
         let iconColor = canAfford ? (isDiscount ? 'text-purple-400' : 'text-sky-400') : 'text-slate-500';
         let cursorClass = canAfford ? 'cursor-pointer hover:bg-slate-800 hover:scale-[1.05] active:scale-95 group' : 'opacity-50 cursor-not-allowed';
         
-        card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 ${cursorClass}`;
+        card.className = `w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 ${cursorClass}`;
         
         card.innerHTML = `
             <div class="flex-shrink-0 mt-2">
@@ -1968,7 +1976,7 @@ export function showShop(isDiscount = false) {
                 updateUI();
                 // 一度買ったら売り切れ（またはボタン無効化）
                 card.onclick = null;
-                card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 border-slate-700 p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 opacity-50 cursor-not-allowed`;
+                card.className = `w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-900 border-2 border-slate-700 p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 opacity-50 cursor-not-allowed`;
                 card.querySelector('i').className = `w-12 h-12 text-slate-500`;
                 
                 // 他のボタンも所持金不足になってないかチェックして更新する処理が必要だが、
@@ -1980,7 +1988,7 @@ export function showShop(isDiscount = false) {
 
     // Add Leave Button
     const skipCard = document.createElement('div');
-    skipCard.className = 'w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
+    skipCard.className = 'w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
     skipCard.innerHTML = `
         <div class="flex-shrink-0 mt-2">
             <i data-lucide="footprints" class="w-12 h-12 text-slate-400"></i>

@@ -139,6 +139,18 @@ export function updateUI() {
     const pChgE = player.chgE + (player.tempChgE || 0);
     const cChgE = cpu.chgE + (cpu.tempChgE || 0);
 
+    // プレイヤーアイコンの初期化・更新
+    let playerIconHtml = `<i data-lucide="${player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+    if (gameState.gameMode === 'tower') {
+        playerIconHtml += `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
+    }
+    const pic = document.getElementById('player-icon-container');
+    if (pic.innerHTML !== playerIconHtml) {
+        pic.innerHTML = playerIconHtml;
+        document.getElementById('player-name-label').innerText = player.name;
+        if (window.lucide) window.lucide.createIcons();
+    }
+
     document.getElementById('player-hp-bar').style.width = `${(pHP / player.hp) * 100}%`;
     document.getElementById('cpu-hp-bar').style.width = `${(cHP / cpu.hp) * 100}%`;
     document.getElementById('player-hp-text').innerText = `HP ${pHP} / ${player.hp}`;

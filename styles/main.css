@@ -309,11 +309,7 @@ body {
 }
 
 #command-wrapper {
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    /* layout classes are moved to html */
 }
 
 .ui-hidden {
