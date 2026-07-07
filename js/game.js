@@ -854,7 +854,7 @@ export function showMap() {
     const choicesContainer = document.getElementById('map-choices-container');
     
     // Hide battle elements if they are visible
-    document.getElementById('game-container').classList.add('hidden');
+    document.getElementById('game-container')?.classList.add('hidden');
     document.getElementById('treasure-overlay').classList.add('hidden');
     
     mapOverlay.classList.remove('hidden');

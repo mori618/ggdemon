@@ -170,8 +170,8 @@ window.retryTower = () => {
     document.getElementById('tower-result-stats').classList.add('hidden');
 
     // Navigate to character selection (keeping tower mode)
-    document.getElementById('game-container').classList.add('hidden');
-    document.getElementById('char-select').classList.remove('hidden');
+    document.getElementById('game-container')?.classList.add('hidden');
+    document.getElementById('select-screen').classList.remove('hidden');
     gameState.selectionState = 'PLAYER';
 };
 
