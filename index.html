@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/peerjs@1.5.0/dist/peerjs.min.js"></script>
     
-  <script type="module" crossorigin src="./assets/index-96f3bcd1.js"></script>
+  <script type="module" crossorigin src="./assets/index-8bb358a3.js"></script>
   <link rel="stylesheet" href="./assets/index-4d3e42d6.css">
 </head>
 
@@ -378,7 +378,7 @@
         </div>
 
         <!-- イベント時のアイテム選択エリア -->
-        <div id="event-items-container" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center gap-4 bg-slate-950/90 backdrop-blur-md p-4 overflow-y-auto" style="scrollbar-width: none;">
+        <div id="event-items-container" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-start gap-4 bg-slate-950/90 backdrop-blur-md p-4 pt-12 pb-20 overflow-y-auto" style="scrollbar-width: none;">
             <!-- Items injected here -->
         </div>
 
@@ -575,9 +575,14 @@
         </div>
     </div>
 
-    <!-- Map Overlay -->
     <div id="map-overlay"
         class="fixed inset-0 z-[140] flex flex-col items-center justify-start hidden bg-slate-950 text-white overflow-hidden">
+        
+        <!-- Debug Button -->
+        <button onclick="window.debugForceEvent()" class="absolute top-4 right-4 bg-purple-900/50 text-purple-300 border border-purple-700 px-3 py-1 rounded-full text-[10px] font-orbitron font-black uppercase tracking-widest hover:bg-purple-800 transition-colors z-50">
+            DEBUG
+        </button>
+
         <h2 class="text-3xl font-black italic font-orbitron mt-8 mb-4 uppercase tracking-widest text-sky-400">Tower Map</h2>
         
         <!-- Map visualization area -->
