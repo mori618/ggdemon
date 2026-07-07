@@ -1,8 +1,8 @@
 import { CHARACTERS, GAME_MODES, NETWORK_EVENTS, BOSS_CHARACTERS } from './constants.js';
 import { sound } from './sounds.js';
-import { gameState, loadHighStreak, Deck } from './utils.js';
+import { gameState, loadHighStreak, Deck, hasSaveData, loadGameState, clearGameState } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
-import { setupBattleState, getCpuMove, executeTurn, generateTowerMap, showMap } from './game.js';
+import { setupBattleState, getCpuMove, executeTurn, generateTowerMap, showMap, resumeGame } from './game.js';
 import { network } from './network.js';
 
 window.onload = () => {
@@ -10,6 +10,42 @@ window.onload = () => {
     renderChars(handleCharSelect);
     loadHighStreak();
     syncAudioUI();
+
+    if (hasSaveData()) {
+        const btn = document.getElementById('continue-btn');
+        btn.classList.remove('hidden');
+        // ローカルストレージの内容を少し見てモードを判別する
+        try {
+            const data = JSON.parse(localStorage.getItem('ggdemon_save'));
+            if (data.gameMode === 'normal') {
+                btn.innerText = 'CONTINUE (VS CPU)';
+            } else if (data.gameMode === 'tower') {
+                btn.innerText = 'CONTINUE (TOWER)';
+            }
+        } catch (e) {
+            btn.innerText = 'CONTINUE';
+        }
+    }
+};
+
+window.debugForceEvent = async () => {
+    const eType = prompt("強制発生させるイベントIDを入力してください\n(例: GOLD, SHOP, REST, TREASURE, WEAK_ENEMY, TRIAL...)");
+    if (!eType) return;
+    
+    // Close map if open
+    const mapOverlay = document.getElementById('map-overlay');
+    if (mapOverlay) mapOverlay.classList.add('hidden');
+    
+    const game = await import('./game.js');
+    if (eType === 'SHOP') {
+        game.handleShopRoom();
+    } else if (eType === 'TREASURE') {
+        // Need to set a dummy node to avoid errors
+        gameState.currentMapNode = { type: 'TREASURE', floor: gameState.floor };
+        game.handleTreasureRoom();
+    } else {
+        game.showEvent(null, eType);
+    }
 };
 
 // Online UI Handlers
@@ -109,6 +145,9 @@ window.hideTutorial = () => {
 
 window.goToSelection = (mode) => {
     sound.playSE('click');
+    if (mode === 'normal' || mode === 'tower') {
+        clearGameState(); // 新規スタート時は古いセーブを消去
+    }
     gameState.gameMode = mode;
     gameState.selectionState = 'PLAYER';
     document.getElementById('title-screen').classList.add('hidden');
@@ -437,3 +476,10 @@ function startGame() {
     document.getElementById('select-screen').classList.add('hidden');
     setupBattleState();
 }
+
+window.continueGame = () => {
+    sound.playSE('click');
+    if (loadGameState()) {
+        resumeGame();
+    }
+};

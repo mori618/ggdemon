@@ -31,7 +31,8 @@ export const gameState = {
     gold: 0,
     towerMap: [],
     currentMapNode: null,
-    currentFloorIndex: 0
+    currentFloorIndex: 0,
+    inBattle: false
 };
 
 export class Deck {
@@ -63,4 +64,50 @@ export function loadHighStreak() {
 
 export function saveHighStreak(val) {
     sessionStorage.setItem('bc_high_streak', val);
+}
+
+const SAVE_KEY = 'ggdemon_save';
+
+export function saveGameState() {
+    // オンラインモードはセーブ対象外
+    if (gameState.gameMode === 'ONLINE_HOST' || gameState.gameMode === 'ONLINE_CLIENT') return;
+    
+    try {
+        const data = JSON.stringify(gameState);
+        localStorage.setItem(SAVE_KEY, data);
+    } catch (e) {
+        console.error('Failed to save game state:', e);
+    }
+}
+
+export function loadGameState() {
+    try {
+        const data = localStorage.getItem(SAVE_KEY);
+        if (!data) return false;
+        
+        const parsed = JSON.parse(data);
+        Object.assign(gameState, parsed);
+        
+        // Deckインスタンスの復元
+        if (parsed.mobDeck) {
+            gameState.mobDeck = new Deck([]);
+            Object.assign(gameState.mobDeck, parsed.mobDeck);
+        }
+        if (parsed.bossDeck) {
+            gameState.bossDeck = new Deck([]);
+            Object.assign(gameState.bossDeck, parsed.bossDeck);
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to load game state:', e);
+        return false;
+    }
+}
+
+export function clearGameState() {
+    localStorage.removeItem(SAVE_KEY);
+}
+
+export function hasSaveData() {
+    return localStorage.getItem(SAVE_KEY) !== null;
 }

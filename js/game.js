@@ -1,5 +1,5 @@
 import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS, RISK_MAPPING } from './constants.js';
-import { gameState, saveHighStreak } from './utils.js';
+import { gameState, saveHighStreak, saveGameState, clearGameState } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
 import { calculateTurnResult, updateEffects, getCpuMoveLogic, generateTowerEnemy } from './logic.js';
@@ -101,9 +101,9 @@ export function setupBattleState() {
     badge.classList.remove('bg-purple-600', 'animate-pulse', 'bg-slate-700', 'bg-rose-600', 'bg-amber-600', 'bg-blue-600');
 
     if (gameState.gameMode === 'tower') {
-        document.getElementById('current-floor-val').innerText = gameState.floor;
+        document.getElementById('current-floor-val').innerText = String(gameState.floor);
         const bossIn = 7 - ((gameState.floor - 1) % 7);
-        document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : bossIn;
+        document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : String(bossIn);
 
         let badgeText = `FLOOR ${gameState.floor}`;
         let badgeClass = 'bg-slate-700';
@@ -155,6 +155,9 @@ export function setupBattleState() {
     document.getElementById('btn-ready').classList.remove('hidden');
     setMessage(isBoss ? "WARNING: BOSS ENCOUNTER" : "Command Select");
     lucide.createIcons();
+
+    gameState.inBattle = true;
+    saveGameState();
 }
 
 export function getCpuMove() {
@@ -405,7 +408,7 @@ export function executeTurn(pM, cM) {
                 const playerIconHtml = `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
                 const iconContainer = document.getElementById('player-icon-container');
                 if (iconContainer.querySelector('.absolute')) {
-                    iconContainer.querySelector('.absolute').innerText = gameState.lives;
+                    iconContainer.querySelector('.absolute').innerText = String(gameState.lives);
                 }
                 updateUI();
             }
@@ -430,6 +433,7 @@ export function executeTurn(pM, cM) {
                 if (gameState.turn > 1 && !document.getElementById('game-message').innerText.includes('REVIVED')) {
                     setMessage("Command Select");
                 }
+                saveGameState();
             }
         }, 500);
     }, 800);
@@ -437,6 +441,7 @@ export function executeTurn(pM, cM) {
 
 function showFinal(cpuEWin) {
     gameState.gameOver = true;
+    gameState.inBattle = false;
 
     // バトルダイアログを強制的に非表示
     const dialogOverlay = document.getElementById('battle-dialog-overlay');
@@ -473,7 +478,7 @@ function showFinal(cpuEWin) {
                 gameState.currentBossIsStrong = false;
             }
             gameState.gold += gainedGold;
-            document.getElementById('player-gold-val').innerText = gameState.gold;
+            updateUI();
 
             desc.innerText = `${d}\n\n[ LOOT ]\n+${gainedGold} GOLD`;
 
@@ -486,6 +491,8 @@ function showFinal(cpuEWin) {
                     if (gameState.currentMapNode && gameState.currentMapNode.type === 'ELITE') {
                         showTreasure(false);
                     } else if (gameState.currentMapNode && gameState.currentMapNode.type === 'BOSS') {
+                        showTreasure(false);
+                    } else if (gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST') {
                         showTreasure(false);
                     } else {
                         showMap();
@@ -500,14 +507,16 @@ function showFinal(cpuEWin) {
             lucide.createIcons();
             ov.classList.remove('hidden');
             setTimeout(() => ov.classList.add('opacity-100'), 10);
+            
+            saveGameState();
             return;
         } else {
             // DEFEAT logic for Tower Mode
             towerStats?.classList.remove('hidden');
             if (towerStats) towerStats.style.display = 'flex'; // Ensure flex layout
 
-            document.getElementById('final-floor-val').innerText = gameState.floor;
-            document.getElementById('final-kills-val').innerText = gameState.enemiesDefeated || 0;
+            document.getElementById('final-floor-val').innerText = String(gameState.floor);
+            document.getElementById('final-kills-val').innerText = String(gameState.enemiesDefeated || 0);
 
             // Boss List
             const bossList = document.getElementById('final-boss-list');
@@ -534,10 +543,10 @@ function showFinal(cpuEWin) {
             const atkEl = document.getElementById('res-atk');
             const chgEl = document.getElementById('res-chg');
             const engEl = document.getElementById('res-eng');
-            if (hpEl) hpEl.innerText = p.hp;
-            if (atkEl) atkEl.innerText = p.atk;
-            if (chgEl) chgEl.innerText = p.chgE;
-            if (engEl) engEl.innerText = p.startE;
+            if (hpEl) hpEl.innerText = String(p.hp);
+            if (atkEl) atkEl.innerText = String(p.atk);
+            if (chgEl) chgEl.innerText = String(p.chgE);
+            if (engEl) engEl.innerText = String(p.startE);
 
             // Skill
             const s = gameState.playerSkill;
@@ -569,6 +578,8 @@ function showFinal(cpuEWin) {
     lucide.createIcons();
     ov.classList.remove('hidden');
     setTimeout(() => ov.classList.add('opacity-100'), 10);
+    
+    clearGameState();
 }
 
 
@@ -846,13 +857,13 @@ export function generateTowerMap(totalFloors = 7) {
                 currentLayerHasShop = true;
             } else {
                 // Normal generation
-                if (r < 0.3) type = 'BATTLE';
-                else if (r < 0.4) {
+                if (r < 0.25) type = 'BATTLE';
+                else if (r < 0.35) {
                     if (f >= 3) type = 'ELITE'; // Elites from floor 3
                     else type = 'BATTLE';
                 }
-                else if (r < 0.65) type = 'TREASURE';
-                else if (r < 0.80) {
+                else if (r < 0.55) type = 'TREASURE';
+                else if (r < 0.70) {
                     if (!prevLayerHadShop) {
                         type = 'SHOP';
                         currentLayerHasShop = true;
@@ -860,7 +871,7 @@ export function generateTowerMap(totalFloors = 7) {
                         type = 'TREASURE';
                     }
                 }
-                else if (r < 0.90) type = 'EVENT_SAFE';
+                else if (r < 0.85) type = 'EVENT_SAFE';
                 else type = 'EVENT_RISK';
                 
                 if (type === 'BATTLE' || type === 'ELITE') {
@@ -912,7 +923,7 @@ export function generateTowerMap(totalFloors = 7) {
             hiddenNode.isRoute = isRoute;
             hiddenNodes.push(hiddenNode);
             
-            // Connect from a random normal node from prevLayer
+            // Connect from a random normal node from prevLayer (allows crossing as a 3rd option)
             const availableParents = prevLayer.filter(n => !n.isRoute);
             const p = availableParents[Math.floor(Math.random() * availableParents.length)] || prevLayer[0];
             p.children.push(hiddenNode.id);
@@ -939,8 +950,8 @@ export function generateTowerMap(totalFloors = 7) {
                 return Math.abs(aPos - relPos) - Math.abs(bPos - relPos);
             });
             
-            // Pick 2 or 3 closest (guarantees at least 2 choices)
-            const numChoices = Math.min(normalNodes.length, Math.floor(Math.random() * 2) + 2); // 2 or 3
+            // Pick 1 or 2 closest. 1 forward connection happens roughly 20% of the time.
+            const numChoices = Math.min(normalNodes.length, Math.random() < 0.2 ? 1 : 2);
             const targets = sortedTargets.slice(0, numChoices);
             
             targets.forEach(t => {
@@ -971,7 +982,7 @@ export function generateTowerMap(totalFloors = 7) {
         // Now handle hidden single nodes from prev layer
         const prevHiddenSingleNodes = prevLayer.filter(n => n.hidden && !n.isRoute);
         prevHiddenSingleNodes.forEach(p => {
-            // connect to 1 or 2 random normal nodes
+            // connect to 1 or 2 random normal nodes (allows crossing back as a 3rd option)
             let targets = [...normalNodes].sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 2) + 1);
             targets.forEach(t => {
                 if (!p.children.includes(t.id)) {
@@ -998,6 +1009,7 @@ export function generateTowerMap(totalFloors = 7) {
 }
 
 export function showMap() {
+    saveGameState();
     const mapOverlay = document.getElementById('map-overlay');
     const container = document.getElementById('map-container');
     const choicesContainer = document.getElementById('map-choices-container');
@@ -1141,9 +1153,14 @@ function renderMapNodes(container) {
         // Scroll to current node
         if (gameState.currentMapNode && nodeElements[gameState.currentMapNode.id]) {
             const currentElement = nodeElements[gameState.currentMapNode.id].element;
-            // Target scroll so the element is roughly in the center of the visible area
-            // We add + 150 to shift the view down (moving the element UP), avoiding the footer
-            const targetScrollTop = currentElement.offsetTop - (container.clientHeight / 2) + 150;
+            const containerRect = container.getBoundingClientRect();
+            const elementRect = currentElement.getBoundingClientRect();
+            
+            // Calculate absolute top relative to the scroll container's content
+            const absoluteElementTop = elementRect.top - containerRect.top + container.scrollTop;
+            
+            // Target scroll so the element is roughly 250px above the bottom of the visible container area (avoiding the footer)
+            const targetScrollTop = absoluteElementTop - container.clientHeight + 250;
             container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
         } else {
             container.scrollTop = container.scrollHeight;
@@ -1160,8 +1177,39 @@ function renderMapChoices(container) {
     const childrenIds = gameState.currentMapNode.children;
     
     if (childrenIds.length === 0) {
-        // Handle end of tower
-        container.innerHTML = '<div class="text-emerald-400 font-orbitron text-xl">TOWER CLEARED!</div>';
+        // Extend the map by generating next set of floors
+        const currentFloor = gameState.currentFloorIndex;
+        const newMapPart = generateTowerMap(7); // generates 0 to 7. 0 is start node.
+        
+        // Fix up floor numbers and IDs
+        for(let i = 1; i < newMapPart.length; i++) {
+             const layer = newMapPart[i];
+             layer.forEach(n => {
+                 n.floor += currentFloor;
+                 n.id = n.id + `_ext_${currentFloor}`;
+                 // also update references in parents and children for intra-newMapPart connections
+                 n.parents = n.parents.map(pId => pId + `_ext_${currentFloor}`);
+                 n.children = n.children.map(cId => cId + `_ext_${currentFloor}`);
+             });
+        }
+        
+        // Connect boss node to new layer 1
+        const newLayer1 = newMapPart[1];
+        const newStartNode = newMapPart[0][0];
+        
+        newLayer1.forEach(n => {
+            // Replace the newStartNode's ID in the parents array with the boss node's ID
+            n.parents = n.parents.map(pId => pId.includes('node-0_ext') || pId === newStartNode.id ? gameState.currentMapNode.id : pId);
+            gameState.currentMapNode.children.push(n.id);
+        });
+        
+        // Append new layers to towerMap
+        for(let i = 1; i < newMapPart.length; i++) {
+             gameState.towerMap.push(newMapPart[i]);
+        }
+        
+        // Re-render map after extending
+        showMap();
         return;
     }
     
@@ -1242,7 +1290,7 @@ window.enterRoom = (node) => {
     gameState.currentFloorIndex = node.floor;
     gameState.floor = node.floor; // Sync with existing floor logic
     
-    document.getElementById('current-floor-val').innerText = gameState.floor;
+    document.getElementById('current-floor-val').innerText = String(gameState.floor);
     
     const mapOverlay = document.getElementById('map-overlay');
     mapOverlay.classList.add('hidden');
@@ -1330,7 +1378,7 @@ export function closeEventScreen() {
     document.getElementById('event-command-wrapper').classList.add('hidden');
 }
 
-export function showEvent(nodeType = 'EVENT_SAFE') {
+export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
     // Helper to close event and proceed to map
     const closeEvent = () => {
         closeEventScreen();
@@ -1349,7 +1397,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
     ];
 
     const eventTypes = nodeType === 'EVENT_RISK' ? riskEvents : safeEvents;
-    let eType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+    let eType = debugForceType || eventTypes[Math.floor(Math.random() * eventTypes.length)];
     
     // Reroll logic
     if (['SKILL_UPGRADE', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'].includes(eType) && !gameState.playerSkill) {
@@ -1372,7 +1420,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = '隠された宝箱を見つけた！\nコインを獲得した。';
         options.push({ text: 'Continue', icon: 'arrow-right', onClick: () => {
             gameState.gold += Math.floor(Math.random() * 20) + 15;
-            document.getElementById('player-gold-val').innerText = gameState.gold;
+            updateUI();
             closeEvent();
         }, colorClass: 'bg-amber-900 text-amber-200 border-amber-600 hover:bg-amber-800' });
     } else if (eType === 'MEGA_GOLD') {
@@ -1382,7 +1430,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = 'まばゆく光る大量の金貨の山を発見した！';
         options.push({ text: 'Take all', icon: 'coins', onClick: () => {
             gameState.gold += Math.floor(Math.random() * 51) + 50;
-            document.getElementById('player-gold-val').innerText = gameState.gold;
+            updateUI();
             closeEvent();
         }, colorClass: 'bg-amber-900 text-amber-200 border-amber-600 hover:bg-amber-800' });
     } else if (eType === 'TRAP') {
@@ -1393,7 +1441,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         options.push({ text: 'Ouch...', icon: 'skull', onClick: () => {
             gameState.pHP = Math.max(1, gameState.pHP - 10);
             gameState.player.hp = gameState.pHP;
-            updateHP();
+            updateUI();
             closeEvent();
         }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
     } else if (eType === 'FREE_BUFF') {
@@ -1405,7 +1453,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = `不思議な光があなたを包み込む...\n\n${merit.text.replace('$V', val)}`;
         options.push({ text: 'Accept', icon: 'check', onClick: () => {
             merit.apply(gameState.pChar, val);
-            updateStatusDisplay();
+            updateUI();
             closeEvent();
         }, colorClass: 'bg-sky-900 text-sky-200 border-sky-600 hover:bg-sky-800' });
     } else if (eType === 'TRIAL') {
@@ -1417,8 +1465,8 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
             gameState.pChar.hp = Math.max(1, gameState.pChar.hp - 10);
             gameState.pHP = Math.min(gameState.pHP, gameState.pChar.hp);
             gameState.pChar.atk += 5;
-            updateHP();
-            updateStatusDisplay();
+            gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
+            updateUI();
             closeEvent();
         }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
         options.push({ text: 'Refuse', icon: 'x', onClick: () => closeEvent() });
@@ -1429,7 +1477,8 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = '凶暴な魔物が立ち塞がっている！\n倒せば多額の報酬が得られそうだ。';
         options.push({ text: 'Fight', icon: 'swords', onClick: () => {
             closeEventScreen();
-            startBattle(true); // force elite
+            gameState.nextBattleIsElite = true;
+            setupBattleState();
         }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
         options.push({ text: 'Flee', icon: 'footprints', onClick: () => closeEvent() });
     } else if (eType === 'EXTRA_LIFE') {
@@ -1440,8 +1489,8 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         options.push({ text: 'Drink', icon: 'droplet', onClick: () => {
             gameState.pChar.hp += 10;
             gameState.pHP = gameState.pChar.hp;
-            updateHP();
-            updateStatusDisplay();
+            gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
+            updateUI();
             closeEvent();
         }, colorClass: 'bg-pink-900 text-pink-200 border-pink-600 hover:bg-pink-800' });
         options.push({ text: 'Leave it', icon: 'x', onClick: () => closeEvent() });
@@ -1486,7 +1535,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         }
         options.push({ text: 'Effect Boost', icon: 'arrow-up', disabled: gameState.gold < 30, onClick: () => {
             gameState.gold -= 30;
-            document.getElementById('player-gold-val').innerText = gameState.gold;
+            updateUI();
             gameState.pChar.skillEffectBonus = (gameState.pChar.skillEffectBonus || 0) + 1;
             closeEvent();
         }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
@@ -1498,7 +1547,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = `「君のスキル『${gameState.playerSkill.name}』、なかなか良いものだ。60Gで買い取らせてくれないか？」\n（スキルを失います）`;
         options.push({ text: 'Sell (60G)', icon: 'coins', onClick: () => {
             gameState.gold += 60;
-            document.getElementById('player-gold-val').innerText = gameState.gold;
+            updateUI();
             gameState.playerSkill = null;
             gameState.pChar.skillCostBonus = 0;
             gameState.pChar.skillEffectBonus = 0;
@@ -1533,7 +1582,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         options.push({ text: 'Sneak Attack', icon: 'sword', onClick: () => {
             closeEventScreen();
             gameState.nextBattleEffects = [{ type: 'DMG_REDUCE', amount: 999, turns: 1 }];
-            startBattle();
+            setupBattleState();
         }, colorClass: 'bg-lime-900 text-lime-200 border-lime-600 hover:bg-lime-800' });
         options.push({ text: 'Ignore', icon: 'footprints', onClick: () => closeEvent() });
     } else if (eType === 'INVINCIBLE_BUFF') {
@@ -1593,12 +1642,16 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = '手負いの魔物がいる。弱っているようだが...';
         options.push({ text: 'Attack', icon: 'sword', onClick: () => {
             closeEventScreen();
-            startBattle(true);
-            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id);
-            gameState.cChar.hp = Math.max(1, Math.floor(baseChar.hp / 2));
-            gameState.cChar.atk = Math.max(1, Math.floor(baseChar.atk / 2));
-            updateHP(true);
-            updateStatusDisplay();
+            gameState.nextBattleIsElite = true;
+            setupBattleState();
+            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id) || BOSS_CHARACTERS.find(c => c.id === gameState.cpu.id);
+            if (baseChar) {
+                gameState.cChar.hp = Math.max(1, Math.floor(baseChar.hp / 2));
+                gameState.cChar.atk = Math.max(1, Math.floor(baseChar.atk / 2));
+                gameState.cpu = JSON.parse(JSON.stringify(gameState.cChar));
+                gameState.cHP = gameState.cpu.hp;
+                updateUI();
+            }
         }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
         options.push({ text: 'Leave', icon: 'footprints', onClick: () => closeEvent() });
     } else if (eType === 'STRONG_BOSS') {
@@ -1608,14 +1661,17 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         desc = '怒り狂う強大な魔物がいる！倒せば莫大な報酬が手に入るだろう。';
         options.push({ text: 'Challenge', icon: 'swords', onClick: () => {
             closeEventScreen();
-            startBattle(true);
-            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id);
-            gameState.cChar.hp = Math.floor(baseChar.hp * 1.5);
-            gameState.cChar.atk = Math.floor(baseChar.atk * 1.5);
-            gameState.cHP = gameState.cChar.hp;
-            gameState.nextBattleEffects = [{ type: 'REWARD_UP', amount: 3, turns: 99 }];
-            updateHP(true);
-            updateStatusDisplay();
+            gameState.nextBattleIsElite = true;
+            setupBattleState();
+            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id) || BOSS_CHARACTERS.find(c => c.id === gameState.cpu.id);
+            if (baseChar) {
+                gameState.cChar.hp = Math.floor(baseChar.hp * 1.5);
+                gameState.cChar.atk = Math.floor(baseChar.atk * 1.5);
+                gameState.cpu = JSON.parse(JSON.stringify(gameState.cChar));
+                gameState.cHP = gameState.cpu.hp;
+                gameState.nextBattleEffects = [{ type: 'REWARD_UP', amount: 3, turns: 99 }];
+                updateUI();
+            }
         }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
         options.push({ text: 'Flee', icon: 'footprints', onClick: () => closeEvent() });
     } else if (eType === 'CURSED_TREASURE') {
@@ -1626,7 +1682,7 @@ export function showEvent(nodeType = 'EVENT_SAFE') {
         options.push({ text: 'Open (-15 HP)', icon: 'key', onClick: () => {
             gameState.pHP = Math.max(1, gameState.pHP - 15);
             gameState.player.hp = gameState.pHP;
-            updateHP();
+            updateUI();
             closeEventScreen();
             showTreasure(true);
         }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
@@ -1739,7 +1795,7 @@ export function showTreasure(forceSkillPhase = false) {
 
     // Cards wrapper
     const wrapper = document.createElement('div');
-    wrapper.className = 'w-full flex flex-col md:flex-row items-center justify-center gap-4 px-4';
+    wrapper.className = 'w-full flex flex-wrap items-center justify-center gap-4 px-4 pb-8';
     cardsContainer.appendChild(wrapper);
 
     options.forEach(option => {
@@ -1805,26 +1861,24 @@ export function showTreasure(forceSkillPhase = false) {
         wrapper.appendChild(card);
     });
 
-    if (!forceSkillPhase) {
-        // Add Skip Button
-        const skipCard = document.createElement('div');
-        skipCard.className = 'w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
-        skipCard.innerHTML = `
-            <div class="flex-shrink-0 mt-2">
-                <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
-            </div>
-            <div class="flex-1 w-full flex flex-col justify-center">
-                <h3 class="font-orbitron font-bold text-sm mb-2 text-white">SKIP</h3>
-                <div class="text-xs text-slate-500 font-bold uppercase">能力を変更せずに進む</div>
-            </div>
-        `;
-        skipCard.onclick = () => {
-            if (window.sound) window.sound.playSE('click');
-            cardsContainer.classList.add('hidden');
-            selectTreasure({ type: 'skip' }, false);
-        };
-        wrapper.appendChild(skipCard);
-    }
+    // Add Skip Button unconditionally
+    const skipCard = document.createElement('div');
+    skipCard.className = 'w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-800 border-2 border-slate-600 p-4 rounded-xl shadow-lg cursor-pointer hover:bg-slate-700 transition-all flex flex-col items-center text-center gap-4 group hover:scale-[1.05] active:scale-95 opacity-80 hover:opacity-100';
+    skipCard.innerHTML = `
+        <div class="flex-shrink-0 mt-2">
+            <i data-lucide="skip-forward" class="w-12 h-12 text-slate-400"></i>
+        </div>
+        <div class="flex-1 w-full flex flex-col justify-center">
+            <h3 class="font-orbitron font-bold text-sm mb-2 text-white">SKIP</h3>
+            <div class="text-xs text-slate-500 font-bold uppercase">報酬を取得せずに進む</div>
+        </div>
+    `;
+    skipCard.onclick = () => {
+        if (window.sound) window.sound.playSE('click');
+        cardsContainer.classList.add('hidden');
+        selectTreasure({ type: 'skip' }, forceSkillPhase);
+    };
+    wrapper.appendChild(skipCard);
 
     if (window.lucide) window.lucide.createIcons();
 }
@@ -1847,7 +1901,7 @@ export function showShop(isDiscount = false) {
 
     // Cards wrapper
     const wrapper = document.createElement('div');
-    wrapper.className = 'w-full flex flex-col md:flex-row items-center justify-center gap-4 px-4';
+    wrapper.className = 'w-full flex flex-wrap items-center justify-center gap-4 px-4 pb-8';
     cardsContainer.appendChild(wrapper);
 
     // Generate 3 random items
@@ -1907,11 +1961,11 @@ export function showShop(isDiscount = false) {
             card.onclick = () => {
                 if (window.sound) window.sound.playSE('click');
                 gameState.gold -= item.cost;
-                document.getElementById('player-gold-val').innerText = gameState.gold;
-                document.getElementById('event-shop-gold').innerText = gameState.gold;
+                updateUI();
+                document.getElementById('event-shop-gold').innerText = String(gameState.gold);
                 item.action();
-                updateHP();
-                updateStatusDisplay();
+                gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
+                updateUI();
                 // 一度買ったら売り切れ（またはボタン無効化）
                 card.onclick = null;
                 card.className = `w-full max-w-xs md:max-w-[240px] h-full min-h-[160px] bg-slate-900 border-2 border-slate-700 p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 opacity-50 cursor-not-allowed`;
@@ -1944,4 +1998,83 @@ export function showShop(isDiscount = false) {
     wrapper.appendChild(skipCard);
 
     if (window.lucide) window.lucide.createIcons();
+}
+
+export function resumeGame() {
+    // UIを初期化
+    if (gameState.inBattle) {
+        document.getElementById('select-screen').classList.add('hidden');
+        document.getElementById('title-screen').classList.add('hidden');
+        document.getElementById('online-screen').classList.add('hidden');
+        
+        document.getElementById('cmd-SKILL').classList.toggle('hidden', gameState.gameMode !== 'tower');
+        document.getElementById('tower-indicator').classList.toggle('hidden', gameState.gameMode !== 'tower');
+
+        const badge = document.getElementById('cpu-level-badge');
+        badge.classList.remove('bg-purple-600', 'animate-pulse', 'bg-slate-700', 'bg-rose-600', 'bg-amber-600', 'bg-blue-600');
+
+        if (gameState.gameMode === 'tower') {
+            document.getElementById('current-floor-val').innerText = String(gameState.floor);
+            const isBoss = (gameState.floor > 0 && gameState.floor % 7 === 0);
+            const bossIn = 7 - ((gameState.floor - 1) % 7);
+            document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : String(bossIn);
+
+            let badgeText = `FLOOR ${gameState.floor}`;
+            let badgeClass = 'bg-slate-700';
+
+            if (gameState.floor === 0) {
+                badgeText = 'START';
+                badgeClass = 'bg-amber-600';
+            } else if (isBoss) {
+                badgeText = 'BOSS';
+                badgeClass = 'bg-purple-600 animate-pulse';
+            } else if (gameState.cpu.id === TREASURE_MONSTER.id) {
+                badgeText = 'TREASURE';
+                badgeClass = 'bg-amber-600';
+            }
+
+            badge.innerText = badgeText;
+            badge.classList.add(...badgeClass.split(' '));
+            badge.classList.remove('hidden');
+        } else if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+            badge.innerText = "PLAYER 2";
+            badge.classList.add('bg-blue-600');
+            badge.classList.remove('hidden');
+        } else {
+            badge.innerText = gameState.aiLevel;
+            badge.classList.add('bg-rose-600');
+            badge.classList.remove('hidden');
+        }
+
+        document.getElementById('player-name-label').innerText = gameState.player.name;
+        document.getElementById('cpu-name-label').innerText = gameState.cpu.name;
+        
+        let playerIconHtml = `<i data-lucide="${gameState.player.icon}" class="w-16 h-16 md:w-20 md:h-20 text-blue-400"></i>`;
+        if (gameState.gameMode === 'tower') {
+            playerIconHtml += `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
+        }
+        document.getElementById('player-icon-container').innerHTML = playerIconHtml;
+        
+        const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 7 === 0);
+        document.getElementById('cpu-icon-container').innerHTML = `<i data-lucide="${gameState.cpu.icon}" class="w-16 h-16 md:w-20 md:h-20 ${isBoss ? 'text-purple-500' : 'text-rose-500/50'}"></i>`;
+
+        initEnergy();
+        updateUI();
+        document.getElementById('command-wrapper').classList.remove('ui-hidden');
+        document.getElementById('btn-ready').classList.remove('hidden');
+        
+        if (gameState.turn > 1) {
+            setMessage("Command Select");
+        } else {
+            setMessage(isBoss ? "WARNING: BOSS ENCOUNTER" : "Command Select");
+        }
+        lucide.createIcons();
+    } else {
+        if (gameState.gameMode === 'tower') {
+            document.getElementById('select-screen').classList.add('hidden');
+            document.getElementById('title-screen').classList.add('hidden');
+            document.getElementById('tower-indicator').classList.remove('hidden');
+            showMap();
+        }
+    }
 }

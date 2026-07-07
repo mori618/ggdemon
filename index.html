@@ -31,6 +31,8 @@
                 class="bg-white text-slate-950 py-5 rounded-2xl font-black font-orbitron text-2xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">VSCPU</button>
             <button onclick="goToSelection('tower')"
                 class="bg-rose-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase border-b-4 border-rose-800">TOWER</button>
+            <button id="continue-btn" onclick="continueGame()"
+                class="hidden bg-amber-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase border-b-4 border-amber-800">CONTINUE</button>
             <button onclick="showOnlineMenu()"
                 class="hidden bg-blue-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase border-b-4 border-blue-800">ONLINE
                 VS</button>
@@ -376,7 +378,7 @@
         </div>
 
         <!-- イベント時のアイテム選択エリア -->
-        <div id="event-items-container" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center gap-4 bg-slate-950/90 backdrop-blur-md p-4 overflow-y-auto" style="scrollbar-width: none;">
+        <div id="event-items-container" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-start gap-4 bg-slate-950/90 backdrop-blur-md p-4 pt-12 pb-20 overflow-y-auto" style="scrollbar-width: none;">
             <!-- Items injected here -->
         </div>
 
@@ -573,9 +575,14 @@
         </div>
     </div>
 
-    <!-- Map Overlay -->
     <div id="map-overlay"
         class="fixed inset-0 z-[140] flex flex-col items-center justify-start hidden bg-slate-950 text-white overflow-hidden">
+        
+        <!-- Debug Button -->
+        <button onclick="window.debugForceEvent()" class="absolute top-4 right-4 bg-purple-900/50 text-purple-300 border border-purple-700 px-3 py-1 rounded-full text-[10px] font-orbitron font-black uppercase tracking-widest hover:bg-purple-800 transition-colors z-50">
+            DEBUG
+        </button>
+
         <h2 class="text-3xl font-black italic font-orbitron mt-8 mb-4 uppercase tracking-widest text-sky-400">Tower Map</h2>
         
         <!-- Map visualization area -->
