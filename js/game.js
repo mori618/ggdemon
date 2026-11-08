@@ -1,65 +1,66 @@
-import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS, RISK_MAPPING } from './constants.js';
+import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASURE_MONSTER, GAME_MODES, PASSIVE_SKILLS, RISK_MAPPING, BOSS_INTERVAL } from './constants.js';
 import { gameState, saveHighStreak, saveGameState, clearGameState } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
-import { calculateTurnResult, updateEffects, getCpuMoveLogic, generateTowerEnemy } from './logic.js';
+import { calculateTurnResult, updateEffects, calcEffectTotals, getCpuMoveLogic, generateTowerEnemy, isBossFloor } from './logic.js';
+
+const bumpAiLevel = (lv, dir) => {
+    const order = ['EASY', 'NORMAL', 'HARD', 'EXPERT'];
+    const i = Math.max(0, order.indexOf(lv));
+    return order[Math.min(order.length - 1, Math.max(0, i + dir))];
+};
 
 export function setupBattleState() {
     gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
     gameState.player.effects = gameState.nextBattleEffects ? [...gameState.nextBattleEffects] : [];
     gameState.nextBattleEffects = []; // 一度使ったらクリア
     gameState.player.tempAtk = gameState.player.tempGrdC = gameState.player.tempChgE = gameState.player.tempChgC = gameState.player.tempDmgReduce = 0;
+    gameState.playerHistory = [];
+    gameState.pendingTurn = null;
 
-    const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 7 === 0);
+    const isTower = gameState.gameMode === GAME_MODES.TOWER;
+    const battleMod = isTower ? (gameState.nextBattleMod || null) : null;
+    gameState.nextBattleMod = null;
+    const isBoss = isTower && (isBossFloor(gameState.floor) || battleMod === 'WEAK_BOSS' || battleMod === 'STRONG_BOSS');
+    gameState.currentBattle = { isBoss, bonusGold: 0, mod: battleMod };
     let baseCpu;
 
     if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
         // Online: cChar is set via network sync
         baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
-    } else if (gameState.gameMode === 'tower') {
-        const cyclePos = (gameState.floor - 1) % 7;
-        if (cyclePos === 0 && !isBoss && gameState.floor > 0) {
-            gameState.treasureFloorOffset = Math.floor(Math.random() * 4);
-        }
-
-        const isTreasure = (!isBoss && gameState.floor > 0 && cyclePos === gameState.treasureFloorOffset);
-
+        baseCpu.effects = [];
+    } else if (isTower) {
         const difficulty = gameState.towerDifficulty || 'NORMAL';
-        const result = generateTowerEnemy(gameState.floor, gameState.mobDeck, gameState.bossDeck, isTreasure, difficulty);
+        const result = generateTowerEnemy(gameState.floor, gameState.mobDeck, gameState.bossDeck, false, difficulty, { isBoss });
         baseCpu = result.cpu;
         gameState.aiLevel = result.aiLevel;
-        
-        // ボスフラグの処理
-        if (isBoss && gameState.nextBossMod) {
-            if (gameState.nextBossMod === 'WEAK') {
-                baseCpu.name = "Weakened " + baseCpu.name;
-                baseCpu.hp = Math.max(1, Math.floor(baseCpu.hp * 0.7));
-                baseCpu.atk = Math.max(1, Math.floor(baseCpu.atk * 0.8));
-                if (gameState.aiLevel === 'EXPERT') gameState.aiLevel = 'HARD';
-                else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'NORMAL';
-            } else if (gameState.nextBossMod === 'STRONG') {
-                baseCpu.name = "Awakened " + baseCpu.name;
-                baseCpu.hp = Math.floor(baseCpu.hp * 1.5);
-                baseCpu.atk = Math.floor(baseCpu.atk * 1.2);
-                baseCpu.chgE += 1;
-                if (gameState.aiLevel === 'EASY') gameState.aiLevel = 'NORMAL';
-                else if (gameState.aiLevel === 'NORMAL') gameState.aiLevel = 'HARD';
-                else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'EXPERT';
-                gameState.currentBossIsStrong = true; // 勝利時の報酬用
-            }
-            gameState.nextBossMod = null; // フラグ消費
+
+        // イベント由来の敵補正
+        if (battleMod === 'WEAK_BOSS') {
+            baseCpu.name = "Injured " + baseCpu.name;
+            baseCpu.hp = Math.max(1, Math.floor(baseCpu.hp / 2));
+            baseCpu.atk = Math.max(1, Math.floor(baseCpu.atk / 2));
+            gameState.aiLevel = bumpAiLevel(gameState.aiLevel, -1);
+            gameState.currentBattle.bonusGold = 30;
+        } else if (battleMod === 'STRONG_BOSS') {
+            baseCpu.name = "Enraged " + baseCpu.name;
+            baseCpu.hp = Math.floor(baseCpu.hp * 1.5);
+            baseCpu.atk = Math.floor(baseCpu.atk * 1.5);
+            baseCpu.chgE += 1;
+            gameState.aiLevel = bumpAiLevel(gameState.aiLevel, 1);
+            gameState.currentBattle.bonusGold = 100;
+        } else if (battleMod === 'MINI_BOSS') {
+            gameState.nextBattleIsElite = true;
+            gameState.currentBattle.bonusGold = 50;
         }
-        
+
         // エリートフラグの処理
         if (gameState.nextBattleIsElite) {
             baseCpu.name = "Elite " + baseCpu.name;
             baseCpu.hp += 3;
             baseCpu.atk += 1;
             baseCpu.chgE += 1;
-            // AIを賢くする
-            if (gameState.aiLevel === 'EASY') gameState.aiLevel = 'NORMAL';
-            else if (gameState.aiLevel === 'NORMAL') gameState.aiLevel = 'HARD';
-            else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'EXPERT';
+            gameState.aiLevel = bumpAiLevel(gameState.aiLevel, 1);
             gameState.nextBattleIsElite = false; // フラグを消費
         }
 
@@ -68,10 +69,7 @@ export function setupBattleState() {
             baseCpu.name = "Weak " + baseCpu.name;
             baseCpu.hp = Math.max(1, Math.floor(baseCpu.hp * 0.6)); // HPを60%に
             baseCpu.atk = Math.max(1, Math.floor(baseCpu.atk * 0.8)); // 攻撃力も少し下げる
-            // AIを優しくする
-            if (gameState.aiLevel === 'EXPERT') gameState.aiLevel = 'HARD';
-            else if (gameState.aiLevel === 'HARD') gameState.aiLevel = 'NORMAL';
-            else if (gameState.aiLevel === 'NORMAL') gameState.aiLevel = 'EASY';
+            gameState.aiLevel = bumpAiLevel(gameState.aiLevel, -1);
             gameState.nextBattleIsWeak = false;
         }
 
@@ -87,10 +85,11 @@ export function setupBattleState() {
     }
 
     gameState.cpu = JSON.parse(JSON.stringify(baseCpu));
-    // gameState.cpu.effects is already set from baseCpu, do not overwrite if it has content
     if (!gameState.cpu.effects) gameState.cpu.effects = [];
 
-    gameState.cpu.tempAtk = gameState.cpu.tempGrdC = gameState.cpu.tempChgE = gameState.cpu.tempChgC = gameState.cpu.tempDmgReduce = 0;
+    // 開始時点で付与されている効果（パッシブ・イベント）を1ターン目から反映
+    Object.assign(gameState.player, calcEffectTotals(gameState.player.effects));
+    Object.assign(gameState.cpu, calcEffectTotals(gameState.cpu.effects));
     gameState.cpuHistory = [];
 
 
@@ -102,7 +101,7 @@ export function setupBattleState() {
 
     if (gameState.gameMode === 'tower') {
         document.getElementById('current-floor-val').innerText = String(gameState.floor);
-        const bossIn = 7 - ((gameState.floor - 1) % 7);
+        const bossIn = BOSS_INTERVAL - ((gameState.floor - 1) % BOSS_INTERVAL);
         document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : String(bossIn);
 
         let badgeText = `FLOOR ${gameState.floor}`;
@@ -134,7 +133,13 @@ export function setupBattleState() {
         badge.classList.remove('hidden');
     }
 
-    gameState.pHP = gameState.player.hp;
+    if (isTower) {
+        // タワーモードではHPを持ち越す（最大HPを超えない・最低1）
+        const carried = (typeof gameState.pHP === 'number' && gameState.pHP > 0) ? gameState.pHP : gameState.player.hp;
+        gameState.pHP = Math.max(1, Math.min(carried, gameState.player.hp));
+    } else {
+        gameState.pHP = gameState.player.hp;
+    }
     gameState.cHP = gameState.cpu.hp;
     gameState.pEnergy = gameState.player.startE;
     gameState.cEnergy = gameState.cpu.startE;
@@ -177,55 +182,44 @@ export function getCpuMove() {
     });
 }
 
-export function executeTurn(pM, cM) {
-    // 1. Update Effects
-    // 1. Update Effects
+function tickEffects() {
+    // ターン終了時に効果のターン数を進め、切れた効果を処理する
     const pUpdate = updateEffects(gameState.player.effects);
     gameState.player.effects = pUpdate.effects;
     Object.assign(gameState.player, pUpdate.totals);
-
-    // Handle Expired Effects (Player)
-    if (pUpdate.expired) {
-        pUpdate.expired.forEach(ex => {
-            if (ex.type === 'DOOM') {
-                gameState.pHP = Math.max(0, gameState.pHP - ex.damage);
-                gameState.player.hp = gameState.pHP; // Sync
-                // Optional: Sound or Visual for Doom triggering
-                sound.playSE('clash'); // Generic damage sound for now
-            }
-            if (ex.type === 'INVINCIBLE_STORE') {
-                // Apply stored damage
-                const multiplier = ex.amount || 1;
-                const dmg = Math.floor(ex.stored * multiplier);
-                gameState.pHP = Math.max(0, gameState.pHP - dmg);
-                gameState.player.hp = gameState.pHP; // Sync
-                sound.playSE('clash');
-                showPassiveAlert('MIRAGE EXPIRED', `Received ${dmg} damage!`);
-            }
-        });
-    }
+    pUpdate.expired.forEach(ex => {
+        if (ex.type === 'DOOM') {
+            gameState.pHP = Math.max(0, gameState.pHP - ex.damage);
+            showDamageNumber('player-icon-container', ex.damage, 'DAMAGE');
+            sound.playSE('clash');
+        }
+        if (ex.type === 'INVINCIBLE_STORE') {
+            const dmg = Math.floor((ex.stored || 0) * (ex.amount || 1));
+            gameState.pHP = Math.max(0, gameState.pHP - dmg);
+            sound.playSE('clash');
+            showPassiveAlert('MIRAGE EXPIRED', `Received ${dmg} damage!`);
+        }
+    });
 
     const cUpdate = updateEffects(gameState.cpu.effects);
     gameState.cpu.effects = cUpdate.effects;
     Object.assign(gameState.cpu, cUpdate.totals);
+    cUpdate.expired.forEach(ex => {
+        if (ex.type === 'DOOM') {
+            gameState.cHP = Math.max(0, gameState.cHP - ex.damage);
+            showDamageNumber('cpu-icon-container', ex.damage, 'DAMAGE');
+            sound.playSE('clash');
+        }
+        if (ex.type === 'INVINCIBLE_STORE') {
+            const dmg = Math.floor((ex.stored || 0) * (ex.amount || 1));
+            gameState.cHP = Math.max(0, gameState.cHP - dmg);
+            sound.playSE('clash');
+        }
+    });
+}
 
-    // Handle Expired Effects (CPU)
-    if (cUpdate.expired) {
-        cUpdate.expired.forEach(ex => {
-            if (ex.type === 'DOOM') {
-                gameState.cHP = Math.max(0, gameState.cHP - ex.damage);
-                gameState.cpu.hp = gameState.cHP; // Sync
-                sound.playSE('clash');
-            }
-            if (ex.type === 'INVINCIBLE_STORE') {
-                const multiplier = ex.amount || 1;
-                const dmg = Math.floor(ex.stored * multiplier);
-                gameState.cHP = Math.max(0, gameState.cHP - dmg);
-                gameState.cpu.hp = gameState.cHP; // Sync
-                sound.playSE('clash');
-            }
-        });
-    }
+export function executeTurn(pM, cM) {
+    const isDouble = gameState.player.effects.some(e => e.type === 'DOUBLE_ACTION');
 
     gameState.playerHistory.push(pM);
     if (gameState.playerHistory.length > 5) gameState.playerHistory.shift();
@@ -266,7 +260,6 @@ export function executeTurn(pM, cM) {
 
     setTimeout(() => {
         // 2. Calculate Result (with Double Action Logic)
-        const isDouble = gameState.player.effects.some(e => e.type === 'DOUBLE_ACTION') || (pUpdate.expired && pUpdate.expired.some(e => e.type === 'DOUBLE_ACTION'));
         const loops = isDouble ? 2 : 1;
 
         if (isDouble) showPassiveAlert('PHANTOM STEP', 'Double Action Triggered!');
@@ -385,7 +378,9 @@ export function executeTurn(pM, cM) {
             }
         }
 
-        updateUI();
+        tickEffects();
+        gameState.pendingTurn = null;
+
         updateUI();
         pC.classList.remove('zone-dim'); cC.classList.remove('zone-dim');
 
@@ -396,7 +391,6 @@ export function executeTurn(pM, cM) {
             if (gameState.pHP <= 0 && gameState.gameMode === 'tower' && gameState.lives > 0) {
                 gameState.lives--;
                 gameState.pHP = gameState.player.hp; // Recover to Max
-                gameState.player.hp = gameState.pHP;
                 sound.playSE('charge'); // Revival sound
 
                 // Visual feedback
@@ -471,33 +465,32 @@ function showFinal(cpuEWin) {
         if (res === 'VICTORY') {
             towerStats?.classList.add('hidden');
             
-            // ゴールドの獲得
-            let gainedGold = Math.floor(Math.random() * 11) + 10;
-            if (gameState.currentBossIsStrong) {
-                gainedGold += 100;
-                gameState.currentBossIsStrong = false;
+            // 撃破記録
+            const battle = gameState.currentBattle || {};
+            gameState.enemiesDefeated = (gameState.enemiesDefeated || 0) + 1;
+            if (battle.isBoss) {
+                gameState.defeatedBosses = [...(gameState.defeatedBosses || []), gameState.cpu.icon];
             }
+
+            // ゴールドの獲得
+            let gainedGold = Math.floor(Math.random() * 11) + 10 + (battle.bonusGold || 0);
             gameState.gold += gainedGold;
+
+            // ボス撃破時はHP全回復
+            let extra = '';
+            if (battle.isBoss) {
+                gameState.pHP = gameState.pChar.hp;
+                extra = '\nHP FULLY RESTORED';
+            }
             updateUI();
 
-            desc.innerText = `${d}\n\n[ LOOT ]\n+${gainedGold} GOLD`;
+            desc.innerText = `${d}\n\n[ LOOT ]\n+${gainedGold} GOLD${extra}`;
 
+            gameState.pendingVictory = true;
             retryB.innerText = 'Next / Proceed';
             retryB.onclick = () => {
                 document.getElementById('result-overlay').classList.add('hidden');
-                gameState.winStreak++;
-                gameState.winsSinceChest++;
-                
-                const type = gameState.currentMapNode ? gameState.currentMapNode.type : null;
-                const isChest = gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST';
-                if (type === 'ELITE' || type === 'WEAK_BATTLE' || type === 'BOSS' || isChest) {
-                    gameState.pendingFloorClearAnim = true;
-                    showTreasure(false);
-                } else {
-                    showFloorClearAnim(() => {
-                        showMap();
-                    });
-                }
+                proceedAfterVictory();
             };
             retryB.classList.remove('hidden');
             retryB.classList.replace('bg-amber-600', 'bg-emerald-600');
@@ -584,10 +577,29 @@ function showFinal(cpuEWin) {
 
 
 
+export function proceedAfterVictory() {
+    if (!gameState.pendingVictory) return;
+    gameState.pendingVictory = false;
+    gameState.winStreak++;
+    gameState.winsSinceChest++;
+
+    const type = gameState.currentMapNode ? gameState.currentMapNode.type : null;
+    const isChest = !!(gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST');
+    const isBoss = !!(gameState.currentBattle && gameState.currentBattle.isBoss && type === 'BOSS');
+    if (type === 'ELITE' || type === 'WEAK_BATTLE' || isBoss || isChest) {
+        gameState.pendingFloorClearAnim = true;
+        showTreasure(false, { isMimic: isChest, isBoss });
+    } else {
+        showFloorClearAnim(() => {
+            showMap();
+        });
+    }
+}
+
 function showFloorClearAnim(callback) {
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 z-[300] bg-slate-950/90 flex flex-col items-center justify-center animate-fade-in';
-    const nextIsBoss = ((gameState.floor + 1) % 7 === 0);
+    const nextIsBoss = isBossFloor(gameState.floor + 1);
     const accentColor = nextIsBoss ? 'text-rose-500' : 'text-emerald-500';
 
     overlay.innerHTML = `
@@ -616,6 +628,42 @@ function showFloorClearAnim(callback) {
     }, 2200);
 }
 
+
+const findStatEffect = (id) => ITEM_EFFECTS.MERITS.find(m => m.id === id) || ITEM_EFFECTS.DEMERITS.find(m => m.id === id);
+
+export function isMeritAvailable(item) {
+    const skill = gameState.playerSkill || null;
+    if (item.id === 'SKILL_COST_DOWN') {
+        if (!skill) return false;
+        const currentCost = Math.max(0, skill.cost + (gameState.pChar.skillCostBonus || 0));
+        return currentCost > 1;
+    }
+    return !item.condition || item.condition(gameState.pChar, skill);
+}
+
+export function getAvailableMerits(excludeIds = new Set()) {
+    return ITEM_EFFECTS.MERITS.filter(item => !excludeIds.has(item.id) && isMeritAvailable(item));
+}
+
+// pChar にステータス効果を適用し、HP増減を現在HPにも反映する
+export function applyStatEffect(effect, value) {
+    const fn = effect.apply || (findStatEffect(effect.id) || {}).apply;
+    if (!fn) return;
+    const p = gameState.pChar;
+    const beforeHp = p.hp;
+    fn(p, value);
+    const delta = p.hp - beforeHp;
+    if (gameState.gameMode === GAME_MODES.TOWER) {
+        if (delta > 0) gameState.pHP = (gameState.pHP || 0) + delta;
+        gameState.pHP = Math.max(1, Math.min(gameState.pHP || p.hp, p.hp));
+    }
+    syncPlayerOutsideBattle();
+}
+
+function syncPlayerOutsideBattle() {
+    if (gameState.inBattle) return;
+    gameState.player = { ...JSON.parse(JSON.stringify(gameState.pChar)), effects: [] };
+}
 
 const getRarityWeights = (floor, difficulty = 'NORMAL') => {
     let weights = { COMMON: 90, RARE: 10, EPIC: 0, LEGENDARY: 0 };
@@ -697,23 +745,8 @@ export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false
         // Regular Treasure or Boss First Phase (Item)
         const chosenMeritIds = new Set();
         for (let i = 0; i < 3; i++) {
-            // Filter: SKILL_COST_DOWN only appears if skill cost > 1
-            let availableMerits = ITEM_EFFECTS.MERITS.filter(item => {
-                if (chosenMeritIds.has(item.id)) return false;
-                if (item.id === 'SKILL_COST_DOWN') {
-                    const s = gameState.playerSkill;
-                    if (!s) return false;
-                    const currentCost = Math.max(0, s.cost + (gameState.pChar.skillCostBonus || 0));
-                    return currentCost > 1;
-                }
-                return !item.condition || item.condition(gameState.pChar, gameState.playerSkill);
-            });
-
-            if (availableMerits.length === 0) {
-                availableMerits = ITEM_EFFECTS.MERITS.filter(item => 
-                    !item.condition || item.condition(gameState.pChar, gameState.playerSkill)
-                );
-            }
+            let availableMerits = getAvailableMerits(chosenMeritIds);
+            if (availableMerits.length === 0) availableMerits = getAvailableMerits();
 
             const merit = availableMerits[Math.floor(Math.random() * availableMerits.length)];
             chosenMeritIds.add(merit.id);
@@ -784,31 +817,32 @@ export function generateTreasureOptions(isMimic, isBoss, forceSkillPhase = false
 export function selectTreasure(reward, fromForceSkillPhase = false) {
     sound.playSE('victory');
     const treasureOverlay = document.getElementById('treasure-overlay');
-    const isBoss = (gameState.floor % 7 === 0);
+    const pending = gameState.pendingTreasure || {};
+    const isBoss = !!pending.isBoss;
+    gameState.pendingTreasure = null;
 
     if (reward.type === 'item') {
-        reward.merit.apply(gameState.pChar, reward.merit.value);
-        if (reward.demerit) reward.demerit.apply(gameState.pChar, reward.demerit.value);
+        applyStatEffect(reward.merit, reward.merit.value);
+        if (reward.demerit) applyStatEffect(reward.demerit, reward.demerit.value);
     } else if (reward.type === 'skill') {
         gameState.playerSkill = reward.skill;
     }
 
-    // ボス撃破後のアイテム選択が終わった直後の場合、スキル選択 phase へ
-    if (isBoss && reward.type !== 'skill' && reward.type !== 'skip' && !fromForceSkillPhase) {
-        treasureOverlay.classList.remove('opacity-100');
+    // ボス撃破後のアイテム選択（SKIP含む）が終わった直後は、スキル選択フェーズへ
+    if (isBoss && reward.type !== 'skill' && !fromForceSkillPhase) {
+        treasureOverlay?.classList.remove('opacity-100');
         setTimeout(() => {
-            treasureOverlay.classList.add('hidden');
-            // スキルフェーズを開始
-            showTreasure(true);
+            treasureOverlay?.classList.add('hidden');
+            showTreasure(true, { isBoss: true });
         }, 300);
         return;
     }
 
     // 通常の遷移
     gameState.winsSinceChest = 0;
-    treasureOverlay.classList.remove('opacity-100');
+    treasureOverlay?.classList.remove('opacity-100');
     setTimeout(() => {
-        treasureOverlay.classList.add('hidden');
+        treasureOverlay?.classList.add('hidden');
         if (gameState.pendingFloorClearAnim) {
             gameState.pendingFloorClearAnim = false;
             showFloorClearAnim(() => {
@@ -1304,11 +1338,7 @@ window.enterRoom = (node) => {
     
     // Route to appropriate handler
     if (node.type === 'BATTLE' || node.type === 'BOSS' || node.type === 'ELITE' || node.type === 'WEAK_BATTLE') {
-        // Battle
-        const deck = (node.type === 'BOSS') ? gameState.bossDeck : gameState.mobDeck;
-        const charId = deck.draw();
-        gameState.cChar = CHARACTERS.find(c => c.id === charId) || BOSS_CHARACTERS.find(c => c.id === charId);
-        
+        // Battle（敵は setupBattleState 内で山札から1体だけ引く）
         gameState.nextBattleIsElite = (node.type === 'ELITE');
         gameState.nextBattleIsWeak = (node.type === 'WEAK_BATTLE');
         setupBattleState();
@@ -1386,6 +1416,14 @@ export function closeEventScreen() {
     document.getElementById('event-command-wrapper').classList.add('hidden');
 }
 
+// TIME_LEAP: 現在の経路上で2階層前の訪問済みノードを探す
+function findTimeLeapTarget() {
+    const targetFloor = (gameState.currentFloorIndex || 0) - 2;
+    if (targetFloor < 1 || !gameState.towerMap) return null;
+    const layer = gameState.towerMap.find(l => l.length && l[0].floor === targetFloor) || [];
+    return layer.find(n => n.visited) || null;
+}
+
 export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
     // Helper to close event and proceed to map
     const closeEvent = () => {
@@ -1396,7 +1434,8 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
     const safeEvents = [
         'GOLD', 'FREE_BUFF', 'EXTRA_LIFE', 'SKILL_DROP', 'SKILL_UPGRADE', 
         'HIDDEN_TREASURE', 'DISCOUNT_SHOP', 'WEAK_ENEMY', 'WEAK_BOSS', 
-        'LEGEND_TREASURE', 'STATUE_BLESSING', 'MEGA_GOLD'
+        'LEGEND_TREASURE', 'STATUE_BLESSING', 'MEGA_GOLD',
+        'INVINCIBLE_BUFF', 'ATK_BOOST_BUFF', 'CHG_BOOST_BUFF'
     ];
     
     const riskEvents = [
@@ -1411,8 +1450,8 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
     if (['SKILL_UPGRADE', 'PAY_SKILL_UPGRADE', 'SKILL_SELL'].includes(eType) && !gameState.playerSkill) {
         eType = 'FREE_BUFF';
     }
-    if (eType === 'TIME_LEAP' && gameState.floor < 3) {
-        eType = 'GOLD';
+    if (eType === 'TIME_LEAP' && !findTimeLeapTarget()) {
+        eType = 'TRAP';
     }
 
     let title = 'Unknown Event';
@@ -1445,10 +1484,9 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         title = 'Ambush!';
         npcColor = 'text-rose-500';
         npcIcon = 'alert-triangle';
-        desc = '罠にかかってしまった！HPにダメージを受けた。';
+        desc = '罠にかかってしまった！HPに 2 ダメージを受けた。';
         options.push({ text: 'Ouch...', icon: 'skull', onClick: () => {
-            gameState.pHP = Math.max(1, gameState.pHP - 10);
-            gameState.player.hp = gameState.pHP;
+            gameState.pHP = Math.max(1, gameState.pHP - 2);
             updateUI();
             closeEvent();
         }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
@@ -1456,11 +1494,12 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         title = 'Blessing';
         npcColor = 'text-sky-400';
         npcIcon = 'sparkles';
-        const merit = ITEM_EFFECTS.MERITS[Math.floor(Math.random() * ITEM_EFFECTS.MERITS.length)];
+        const merits = getAvailableMerits();
+        const merit = merits[Math.floor(Math.random() * merits.length)];
         const val = merit.valueRange[0] + Math.floor(Math.random() * (merit.valueRange[1] - merit.valueRange[0] + 1));
         desc = `不思議な光があなたを包み込む...\n\n${merit.text.replace('$V', val)}`;
         options.push({ text: 'Accept', icon: 'check', onClick: () => {
-            merit.apply(gameState.pChar, val);
+            applyStatEffect(merit, val);
             updateUI();
             closeEvent();
         }, colorClass: 'bg-sky-900 text-sky-200 border-sky-600 hover:bg-sky-800' });
@@ -1468,12 +1507,12 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         title = 'Dark Trial';
         npcColor = 'text-purple-500';
         npcIcon = 'ghost';
-        desc = '「試練を受けよ...」\nHPの最大値が10減るが、攻撃力が5上がる。';
+        desc = '「試練を受けよ...」\nHPの最大値が 2 減るが、攻撃力が 2 上がる。';
         options.push({ text: 'Accept', icon: 'sword', onClick: () => {
-            gameState.pChar.hp = Math.max(1, gameState.pChar.hp - 10);
+            gameState.pChar.hp = Math.max(1, gameState.pChar.hp - 2);
             gameState.pHP = Math.min(gameState.pHP, gameState.pChar.hp);
-            gameState.pChar.atk += 5;
-            gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
+            gameState.pChar.atk += 2;
+            syncPlayerOutsideBattle();
             updateUI();
             closeEvent();
         }, colorClass: 'bg-purple-900 text-purple-200 border-purple-600 hover:bg-purple-800' });
@@ -1485,7 +1524,7 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         desc = '凶暴な魔物が立ち塞がっている！\n倒せば多額の報酬が得られそうだ。';
         options.push({ text: 'Fight', icon: 'swords', onClick: () => {
             closeEventScreen();
-            gameState.nextBattleIsElite = true;
+            gameState.nextBattleMod = 'MINI_BOSS';
             setupBattleState();
         }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
         options.push({ text: 'Flee', icon: 'footprints', onClick: () => closeEvent() });
@@ -1493,11 +1532,11 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         title = 'Fountain of Life';
         npcColor = 'text-pink-400';
         npcIcon = 'heart';
-        desc = '清らかな泉が湧き出ている。飲むとHPが最大まで回復し、最大HPも増えそうだ。';
+        desc = '清らかな泉が湧き出ている。飲むと最大HPが 2 増え、HPが最大まで回復しそうだ。';
         options.push({ text: 'Drink', icon: 'droplet', onClick: () => {
-            gameState.pChar.hp += 10;
+            gameState.pChar.hp += 2;
             gameState.pHP = gameState.pChar.hp;
-            gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
+            syncPlayerOutsideBattle();
             updateUI();
             closeEvent();
         }, colorClass: 'bg-pink-900 text-pink-200 border-pink-600 hover:bg-pink-800' });
@@ -1511,9 +1550,7 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         skill.effectValues.forEach(v => sdesc = sdesc.replace('?', v));
         desc = `古い魔導書を見つけた。\n現在のスキルを忘れ、「${skill.name}」を習得する。\n\n【効果】 ${sdesc} (コスト: ${skill.cost})`;
         options.push({ text: 'Learn', icon: 'book', onClick: () => {
-            gameState.playerSkill = skill;
-            gameState.pChar.skillCostBonus = 0;
-            gameState.pChar.skillEffectBonus = 0;
+            gameState.playerSkill = { ...skill, description: sdesc };
             closeEvent();
         }, colorClass: 'bg-indigo-900 text-indigo-200 border-indigo-600 hover:bg-indigo-800' });
         options.push({ text: 'Leave it', icon: 'x', onClick: () => closeEvent() });
@@ -1523,7 +1560,10 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         npcIcon = 'graduation-cap';
         desc = '熟練の魔導士がいる。\n「君のスキル、少しだけ改良してあげよう」';
         options.push({ text: 'Accept', icon: 'wrench', onClick: () => {
-            gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+            const cost = Math.max(0, gameState.playerSkill.cost + (gameState.pChar.skillCostBonus || 0));
+            // コストが既に0なら効果量アップに切り替え
+            if (cost > 0) gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+            else gameState.pChar.skillEffectBonus = (gameState.pChar.skillEffectBonus || 0) + 1;
             closeEvent();
         }, colorClass: 'bg-blue-900 text-blue-200 border-blue-600 hover:bg-blue-800' });
         options.push({ text: 'Refuse', icon: 'x', onClick: () => closeEvent() });
@@ -1536,8 +1576,8 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         if (currentCost > 0) {
             options.push({ text: 'Cost Down', icon: 'arrow-down', disabled: gameState.gold < 50, onClick: () => {
                 gameState.gold -= 50;
-                document.getElementById('player-gold-val').innerText = gameState.gold;
                 gameState.pChar.skillCostBonus = (gameState.pChar.skillCostBonus || 0) - 1;
+                updateUI();
                 closeEvent();
             }, colorClass: 'bg-orange-900 text-orange-200 border-orange-600 hover:bg-orange-800' });
         }
@@ -1557,8 +1597,6 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
             gameState.gold += 60;
             updateUI();
             gameState.playerSkill = null;
-            gameState.pChar.skillCostBonus = 0;
-            gameState.pChar.skillEffectBonus = 0;
             closeEvent();
         }, colorClass: 'bg-emerald-900 text-emerald-200 border-emerald-600 hover:bg-emerald-800' });
         options.push({ text: 'Refuse', icon: 'x', onClick: () => closeEvent() });
@@ -1639,7 +1677,12 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         npcIcon = 'clock';
         desc = '時空の歪みを発見した。これを使えば少し前に戻れるかもしれない。';
         options.push({ text: 'Leap (-2 Floors)', icon: 'rewind', onClick: () => {
-            gameState.floor = Math.max(1, gameState.floor - 2);
+            const target = findTimeLeapTarget();
+            if (target) {
+                gameState.currentMapNode = target;
+                gameState.currentFloorIndex = target.floor;
+                gameState.floor = target.floor;
+            }
             closeEvent();
         }, colorClass: 'bg-cyan-900 text-cyan-200 border-cyan-600 hover:bg-cyan-800' });
         options.push({ text: 'Ignore', icon: 'x', onClick: () => closeEvent() });
@@ -1650,16 +1693,8 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         desc = '手負いの魔物がいる。弱っているようだが...';
         options.push({ text: 'Attack', icon: 'sword', onClick: () => {
             closeEventScreen();
-            gameState.nextBattleIsElite = true;
+            gameState.nextBattleMod = 'WEAK_BOSS';
             setupBattleState();
-            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id) || BOSS_CHARACTERS.find(c => c.id === gameState.cpu.id);
-            if (baseChar) {
-                gameState.cChar.hp = Math.max(1, Math.floor(baseChar.hp / 2));
-                gameState.cChar.atk = Math.max(1, Math.floor(baseChar.atk / 2));
-                gameState.cpu = JSON.parse(JSON.stringify(gameState.cChar));
-                gameState.cHP = gameState.cpu.hp;
-                updateUI();
-            }
         }, colorClass: 'bg-rose-900 text-rose-200 border-rose-600 hover:bg-rose-800' });
         options.push({ text: 'Leave', icon: 'footprints', onClick: () => closeEvent() });
     } else if (eType === 'STRONG_BOSS') {
@@ -1669,17 +1704,8 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         desc = '怒り狂う強大な魔物がいる！倒せば莫大な報酬が手に入るだろう。';
         options.push({ text: 'Challenge', icon: 'swords', onClick: () => {
             closeEventScreen();
-            gameState.nextBattleIsElite = true;
+            gameState.nextBattleMod = 'STRONG_BOSS';
             setupBattleState();
-            const baseChar = CHARACTERS.find(c => c.id === gameState.cpu.id) || BOSS_CHARACTERS.find(c => c.id === gameState.cpu.id);
-            if (baseChar) {
-                gameState.cChar.hp = Math.floor(baseChar.hp * 1.5);
-                gameState.cChar.atk = Math.floor(baseChar.atk * 1.5);
-                gameState.cpu = JSON.parse(JSON.stringify(gameState.cChar));
-                gameState.cHP = gameState.cpu.hp;
-                gameState.nextBattleEffects = [{ type: 'REWARD_UP', amount: 3, turns: 99 }];
-                updateUI();
-            }
         }, colorClass: 'bg-red-900 text-red-200 border-red-600 hover:bg-red-800' });
         options.push({ text: 'Flee', icon: 'footprints', onClick: () => closeEvent() });
     } else if (eType === 'CURSED_TREASURE') {
@@ -1687,9 +1713,8 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         npcColor = 'text-purple-600';
         npcIcon = 'package-x';
         desc = '禍々しいオーラを放つ宝箱がある。\n開けると強力な呪いを受けるが、中身は期待できそうだ。';
-        options.push({ text: 'Open (-15 HP)', icon: 'key', onClick: () => {
-            gameState.pHP = Math.max(1, gameState.pHP - 15);
-            gameState.player.hp = gameState.pHP;
+        options.push({ text: 'Open (-3 HP)', icon: 'key', onClick: () => {
+            gameState.pHP = Math.max(1, gameState.pHP - 3);
             updateUI();
             closeEventScreen();
             showTreasure(true);
@@ -1705,7 +1730,7 @@ export function showEvent(nodeType = 'EVENT_SAFE', debugForceType = null) {
         skill.effectValues.forEach(v => sdesc = sdesc.replace('?', v));
         desc = `黄金に輝く祠がある。\n伝説のスキル「${skill.name}」を習得できる。\n（現在のスキルは上書きされます）\n\n【効果】 ${sdesc} (コスト: ${skill.cost})`;
         options.push({ text: 'Learn', icon: 'star', onClick: () => {
-            gameState.playerSkill = skill;
+            gameState.playerSkill = { ...skill, description: sdesc };
             closeEvent();
         }, colorClass: 'bg-amber-900 text-amber-200 border-amber-600 hover:bg-amber-800' });
         options.push({ text: 'Leave', icon: 'x', onClick: () => closeEvent() });
@@ -1781,11 +1806,19 @@ export function handleShopRoom(isDiscount = false) {
         ]);
     }
 }
-export function showTreasure(forceSkillPhase = false) {
+export function showTreasure(forceSkillPhase = false, opts = {}) {
     const cardsContainer = document.getElementById('event-items-container');
-    const isMimic = (gameState.cpu && gameState.cpu.id === 'TREASURE_CHEST');
-    const isBoss = (gameState.floor % 7 === 0);
-    const options = generateTreasureOptions(isMimic, isBoss, forceSkillPhase);
+    let isMimic = !!opts.isMimic;
+    let isBoss = !!opts.isBoss;
+    let options;
+    if (opts.restoreOptions) {
+        options = opts.restoreOptions;
+    } else {
+        options = generateTreasureOptions(isMimic, isBoss, forceSkillPhase);
+    }
+    // リロードしても同じ報酬から選べるよう保存
+    gameState.pendingTreasure = { forceSkillPhase, isMimic, isBoss, options };
+    saveGameState();
     
     // Clear and Show
     cardsContainer.innerHTML = '';
@@ -1917,74 +1950,78 @@ export function showShop(isDiscount = false) {
     shopItems.push({
         id: 'heal',
         name: 'HP Potion',
-        desc: 'Restores 30 HP',
+        desc: 'HPを全回復する',
         cost: isDiscount ? 10 : 20,
         icon: 'heart',
         action: () => {
-            gameState.pHP = Math.min(gameState.pChar.hp, gameState.pHP + 30);
-            gameState.player.hp = gameState.pHP;
+            gameState.pHP = gameState.pChar.hp;
         }
     });
-    
-    for(let i=0; i<2; i++) {
-        const merit = ITEM_EFFECTS.MERITS[Math.floor(Math.random() * ITEM_EFFECTS.MERITS.length)];
+
+    const chosen = new Set();
+    for (let i = 0; i < 2; i++) {
+        const pool = getAvailableMerits(chosen);
+        if (pool.length === 0) break;
+        const merit = pool[Math.floor(Math.random() * pool.length)];
+        chosen.add(merit.id);
         const val = merit.valueRange[0] + Math.floor(Math.random() * (merit.valueRange[1] - merit.valueRange[0] + 1));
         let baseCost = val * 5 + 10;
         if (isDiscount) baseCost = Math.floor(baseCost / 2);
-        
+
         shopItems.push({
             id: merit.id,
             name: 'Enhancement',
             desc: `+ ${merit.text.replace('$V', val)}`,
             cost: baseCost,
             icon: 'gem',
-            action: () => {
-                merit.apply(gameState.pChar, val);
-            }
+            action: () => applyStatEffect(merit, val)
         });
     }
 
+    const cards = [];
+    const refreshCards = () => {
+        cards.forEach(({ card, item }) => {
+            const canAfford = !item.sold && gameState.gold >= item.cost;
+            const borderColor = canAfford ? (isDiscount ? 'border-purple-500' : 'border-sky-500') : 'border-slate-700';
+            const iconColor = canAfford ? (isDiscount ? 'text-purple-400' : 'text-sky-400') : 'text-slate-500';
+            const cursorClass = canAfford ? 'cursor-pointer hover:bg-slate-800 hover:scale-[1.05] active:scale-95 group' : 'opacity-50 cursor-not-allowed';
+            card.className = `w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 ${cursorClass}`;
+            const ic = card.querySelector('i, svg');
+            if (ic) ic.setAttribute('class', `w-12 h-12 ${iconColor}`);
+            const costEl = card.querySelector('.shop-cost');
+            if (costEl && item.sold) costEl.innerText = 'SOLD';
+        });
+    };
+
     shopItems.forEach(item => {
         const card = document.createElement('div');
-        const canAfford = gameState.gold >= item.cost;
-        
-        let borderColor = canAfford ? (isDiscount ? 'border-purple-500' : 'border-sky-500') : 'border-slate-700';
-        let iconColor = canAfford ? (isDiscount ? 'text-purple-400' : 'text-sky-400') : 'text-slate-500';
-        let cursorClass = canAfford ? 'cursor-pointer hover:bg-slate-800 hover:scale-[1.05] active:scale-95 group' : 'opacity-50 cursor-not-allowed';
-        
-        card.className = `w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-900 border-2 ${borderColor} p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 ${cursorClass}`;
-        
         card.innerHTML = `
             <div class="flex-shrink-0 mt-2">
-                <i data-lucide="${item.icon}" class="w-12 h-12 ${iconColor}"></i>
+                <i data-lucide="${item.icon}" class="w-12 h-12"></i>
             </div>
             <div class="flex-1 w-full flex flex-col justify-between">
                 <h3 class="font-orbitron font-bold text-sm mb-2 text-white leading-tight">${item.name}</h3>
                 <div class="text-xs text-slate-400 font-bold leading-relaxed mb-2">${item.desc}</div>
-                <div class="font-orbitron font-black text-amber-400 text-lg">${item.cost} G</div>
+                <div class="shop-cost font-orbitron font-black text-amber-400 text-lg">${item.cost} G</div>
             </div>
         `;
-        
-        if (canAfford) {
-            card.onclick = () => {
-                if (window.sound) window.sound.playSE('click');
-                gameState.gold -= item.cost;
-                updateUI();
-                document.getElementById('event-shop-gold').innerText = String(gameState.gold);
-                item.action();
-                gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
-                updateUI();
-                // 一度買ったら売り切れ（またはボタン無効化）
-                card.onclick = null;
-                card.className = `w-full max-w-xs md:max-w-[240px] min-h-[160px] bg-slate-900 border-2 border-slate-700 p-4 rounded-xl shadow-lg transition-all flex flex-col items-center text-center gap-4 opacity-50 cursor-not-allowed`;
-                card.querySelector('i').className = `w-12 h-12 text-slate-500`;
-                
-                // 他のボタンも所持金不足になってないかチェックして更新する処理が必要だが、
-                // 簡単のため、購入後はそのままショップを続けるか、または立ち去るボタンだけを残す
-            };
-        }
+        card.onclick = () => {
+            // クリック時点の所持金で判定（購入後に他の商品が買えなくなる場合に対応）
+            if (item.sold || gameState.gold < item.cost) return;
+            if (window.sound) window.sound.playSE('click');
+            gameState.gold -= item.cost;
+            item.action();
+            item.sold = true;
+            updateUI();
+            const goldEl = document.getElementById('event-shop-gold');
+            if (goldEl) goldEl.innerText = String(gameState.gold);
+            refreshCards();
+            saveGameState();
+        };
+        cards.push({ card, item });
         wrapper.appendChild(card);
     });
+    refreshCards();
 
     // Add Leave Button
     const skipCard = document.createElement('div');
@@ -2023,8 +2060,8 @@ export function resumeGame() {
 
         if (gameState.gameMode === 'tower') {
             document.getElementById('current-floor-val').innerText = String(gameState.floor);
-            const isBoss = (gameState.floor > 0 && gameState.floor % 7 === 0);
-            const bossIn = 7 - ((gameState.floor - 1) % 7);
+            const isBoss = !!(gameState.currentBattle && gameState.currentBattle.isBoss);
+            const bossIn = BOSS_INTERVAL - ((gameState.floor - 1) % BOSS_INTERVAL);
             document.getElementById('boss-in-val').innerText = isBoss ? 'BOSS' : String(bossIn);
 
             let badgeText = `FLOOR ${gameState.floor}`;
@@ -2063,7 +2100,7 @@ export function resumeGame() {
         }
         document.getElementById('player-icon-container').innerHTML = playerIconHtml;
         
-        const isBoss = (gameState.gameMode === 'tower' && gameState.floor > 0 && gameState.floor % 7 === 0);
+        const isBoss = !!(gameState.gameMode === 'tower' && gameState.currentBattle && gameState.currentBattle.isBoss);
         document.getElementById('cpu-icon-container').innerHTML = `<i data-lucide="${gameState.cpu.icon}" class="w-16 h-16 md:w-20 md:h-20 ${isBoss ? 'text-purple-500' : 'text-rose-500/50'}"></i>`;
 
         initEnergy();
@@ -2077,12 +2114,29 @@ export function resumeGame() {
             setMessage(isBoss ? "WARNING: BOSS ENCOUNTER" : "Command Select");
         }
         lucide.createIcons();
+
+        // 行動確定後にリロードされた場合は、確定済みの行動で続きを処理する（やり直し防止）
+        if (gameState.pendingTurn) {
+            const { pM, cM } = gameState.pendingTurn;
+            gameState.selectedCmd = pM;
+            gameState.isProc = true;
+            document.getElementById('command-wrapper').classList.add('ui-hidden');
+            executeTurn(pM, cM);
+        }
     } else {
         if (gameState.gameMode === 'tower') {
             document.getElementById('select-screen').classList.add('hidden');
             document.getElementById('title-screen').classList.add('hidden');
             document.getElementById('tower-indicator').classList.remove('hidden');
-            showMap();
+            updateUI();
+            if (gameState.pendingVictory) {
+                proceedAfterVictory();
+            } else if (gameState.pendingTreasure) {
+                const t = gameState.pendingTreasure;
+                showTreasure(t.forceSkillPhase, { isMimic: t.isMimic, isBoss: t.isBoss, restoreOptions: t.options });
+            } else {
+                showMap();
+            }
         }
     }
 }

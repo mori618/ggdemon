@@ -1,3 +1,5 @@
+import { GAME_MODES } from './constants.js';
+
 export const gameState = {
     selectionState: 'PLAYER',
     aiLevel: 'NORMAL',
@@ -21,7 +23,6 @@ export const gameState = {
     winsSinceChest: 0,
     playerSkill: null,
     playerHistory: [],
-    treasureFloorOffset: 0, // Offset within a 5-floor cycle (0-4, but Floor 5/10 are bosses)
     lives: 0,
     mobDeck: null,
     bossDeck: null,
@@ -56,21 +57,24 @@ export class Deck {
 export const MAX_HISTORY = 5;
 
 export function loadHighStreak() {
-    const saved = sessionStorage.getItem('bc_high_streak');
+    let saved = null;
+    try {
+        saved = localStorage.getItem('bc_high_streak') || sessionStorage.getItem('bc_high_streak');
+    } catch (e) { /* storage unavailable */ }
     if (saved) {
         gameState.highStreak = parseInt(saved);
     }
 }
 
 export function saveHighStreak(val) {
-    sessionStorage.setItem('bc_high_streak', val);
+    try { localStorage.setItem('bc_high_streak', val); } catch (e) { /* storage unavailable */ }
 }
 
 const SAVE_KEY = 'ggdemon_save';
 
 export function saveGameState() {
     // オンラインモードはセーブ対象外
-    if (gameState.gameMode === 'ONLINE_HOST' || gameState.gameMode === 'ONLINE_CLIENT') return;
+    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) return;
     
     try {
         const data = JSON.stringify(gameState);
@@ -86,7 +90,20 @@ export function loadGameState() {
         if (!data) return false;
         
         const parsed = JSON.parse(data);
+        // 旧バージョンでセーブされたオンライン対戦は再開しない
+        if (parsed.gameMode === GAME_MODES.ONLINE_HOST || parsed.gameMode === GAME_MODES.ONLINE_CLIENT) {
+            localStorage.removeItem(SAVE_KEY);
+            return false;
+        }
         Object.assign(gameState, parsed);
+        // セーブデータ内の現在ノードをマップ上の実体と結び付け直す
+        if (gameState.currentMapNode && Array.isArray(gameState.towerMap)) {
+            const id = gameState.currentMapNode.id;
+            for (const layer of gameState.towerMap) {
+                const found = layer.find(n => n.id === id);
+                if (found) { gameState.currentMapNode = found; break; }
+            }
+        }
         
         // Deckインスタンスの復元
         if (parsed.mobDeck) {

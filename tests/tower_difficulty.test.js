@@ -21,7 +21,7 @@ describe('Tower Difficulty Logic', () => {
         });
 
         it('should have different AI levels based on difficulty', () => {
-            const floor = 5; // Boss floor
+            const floor = 7; // Boss floor (BOSS_INTERVAL)
             const easy = generateTowerEnemy(floor, mobDeck, bossDeck, false, 'EASY');
             const hard = generateTowerEnemy(floor, mobDeck, bossDeck, false, 'HARD');
 
