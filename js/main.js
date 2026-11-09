@@ -1,6 +1,6 @@
 import { CHARACTERS, GAME_MODES, NETWORK_EVENTS, BOSS_CHARACTERS } from './constants.js';
 import { sound } from './sounds.js';
-import { gameState, loadHighStreak, Deck, hasSaveData, loadGameState, clearGameState } from './utils.js';
+import { gameState, loadHighStreak, Deck, hasSaveData, loadGameState, clearGameState, saveGameState } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
 import { setupBattleState, getCpuMove, executeTurn, generateTowerMap, showMap, resumeGame } from './game.js';
 import { network } from './network.js';
@@ -287,6 +287,7 @@ window.confirmCommand = () => {
 
         sound.playSE('ready');
         gameState.myMoveCommitted = true;
+        gameState.isProc = true; // 確定後はコマンド変更不可
         document.getElementById('command-wrapper').classList.add('ui-hidden');
         showCommandDetail(null);
         setMessage("Waiting for opponent...");
@@ -306,7 +307,12 @@ window.confirmCommand = () => {
     document.getElementById('command-wrapper').classList.add('ui-hidden');
     setMessage("BATTLE!!");
     showCommandDetail(null);
-    setTimeout(() => executeTurn(gameState.selectedCmd, getCpuMove()), 300);
+    // CPUの行動を決めた時点で保存し、リロードによるやり直しを防ぐ
+    const pM = gameState.selectedCmd;
+    const cM = getCpuMove();
+    gameState.pendingTurn = { pM, cM };
+    saveGameState();
+    setTimeout(() => executeTurn(pM, cM), 300);
 };
 
 window.backToTitle = () => {
@@ -402,6 +408,17 @@ function checkOnlineStart() {
     }
 }
 
+// 相手から届いた行動を検証する（不正な値・コスト不足はCHARGE扱い）
+function sanitizeOpponentMove(move) {
+    const c = gameState.cpu;
+    const e = gameState.cEnergy || 0;
+    if (!c) return 'CHARGE';
+    const grdC = Math.max(0, c.grdC + (c.tempGrdC || 0));
+    if (move === 'ATTACK' && e >= c.atkC) return 'ATTACK';
+    if (move === 'GUARD' && e >= grdC) return 'GUARD';
+    return 'CHARGE';
+}
+
 // Network Data Handler
 network.setOnData((data) => {
     const { type, payload } = data;
@@ -429,7 +446,7 @@ network.setOnData((data) => {
         }
     }
     else if (type === NETWORK_EVENTS.MOVE_REVEAL) {
-        const opponentMove = payload.move;
+        const opponentMove = sanitizeOpponentMove(payload.move);
         executeTurn(gameState.selectedCmd, opponentMove);
         gameState.opponentCommitted = false;
         gameState.myMoveCommitted = false;
@@ -452,6 +469,17 @@ function startTower(diff = 'NORMAL') {
     gameState.winsSinceChest = 0;
     gameState.playerSkill = null;
     gameState.aiLevel = 'NORMAL';
+    gameState.pHP = gameState.pChar.hp; // タワーではHPを持ち越す
+    gameState.player = { ...JSON.parse(JSON.stringify(gameState.pChar)), effects: [] };
+    gameState.inBattle = false;
+    gameState.nextBattleEffects = [];
+    gameState.nextBattleMod = null;
+    gameState.nextBattleIsElite = false;
+    gameState.nextBattleIsWeak = false;
+    gameState.pendingTurn = null;
+    gameState.pendingVictory = false;
+    gameState.pendingTreasure = null;
+    gameState.currentBattle = null;
     
     // Tower Stats reset
     gameState.enemiesDefeated = 0;

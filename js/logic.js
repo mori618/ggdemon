@@ -1,13 +1,42 @@
-import { CHARACTERS, BOSS_CHARACTERS, TREASURE_MONSTER, ENEMY_TRAITS, PASSIVE_SKILLS } from './constants.js';
+import { CHARACTERS, BOSS_CHARACTERS, TREASURE_MONSTER, ENEMY_TRAITS, PASSIVE_SKILLS, BOSS_INTERVAL } from './constants.js';
 
 /**
  * Battle Charge core game logic.
  * Decoupled from DOM and UI for testability.
  */
 
+// スキル効果量ボーナス(skillEffectBonus)を加算する effectValues のインデックス。
+// ターン数やHP消費など「増えると不利になる値」には加算しない。
+const SKILL_BONUS_INDEX = {
+    CONVERT: [1],      // [HP消費, チャージ量] → チャージ量のみ
+    POISON: [1],       // [トリガー, ダメージ] → ダメージのみ
+    DOOM: [1],         // [発動までのターン, ダメージ] → ダメージのみ
+    GRAVITY_ZONE: [1], // [ターン, 弱体量] → 弱体量のみ
+    ZERO_FORM: [0],    // [チャージ量, ガード不可ターン] → チャージ量のみ
+    OVERCLOCK: [],
+    GAMBLER: [],
+    PHANTOM_STEP: []
+};
+
+export function getSkillValues(skill, bonus = 0) {
+    if (!skill || !skill.effectValues) return [];
+    const idx = SKILL_BONUS_INDEX[skill.id] || [0];
+    // 吸血は%値のため、ボーナス1あたり+50%
+    const scale = skill.id === 'VAMPIRE' ? 50 : 1;
+    return skill.effectValues.map((v, i) => idx.includes(i) ? Math.max(1, v + bonus * scale) : v);
+}
+
+function applyPoison(effects, charged, chargeAmount) {
+    const poison = effects.find(e => e.type === 'POISON');
+    if (!poison) return 0;
+    if (poison.trigger === 0) return poison.damage; // 毎ターン発動(猛毒)
+    if (charged && chargeAmount >= poison.trigger) return poison.damage;
+    return 0;
+}
+
 export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkill) {
-    const pAtk = player.atk + (player.tempAtk || 0);
-    const cAtk = cpu.atk + (cpu.tempAtk || 0);
+    const pAtk = Math.max(0, player.atk + (player.tempAtk || 0));
+    const cAtk = Math.max(0, cpu.atk + (cpu.tempAtk || 0));
     const pGrdC = Math.max(0, player.grdC + (player.tempGrdC || 0));
     const cGrdC = Math.max(0, cpu.grdC + (cpu.tempGrdC || 0));
     const pChgC = Math.max(0, (player.chgC || 0) + (player.tempChgC || 0));
@@ -15,6 +44,7 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
     const pChgE = Math.max(0, (player.chgE || 0) + (player.tempChgE || 0));
     const cChgE = Math.max(0, (cpu.chgE || 0) + (cpu.tempChgE || 0));
     const pSkillCost = playerSkill ? Math.max(0, (playerSkill.cost || 0) + (player.skillCostBonus || 0)) : 0;
+    const isSkill = playerMove === 'SKILL' && !!playerSkill;
 
     let pEnergy = player.energy || 0;
     let cEnergy = cpu.energy || 0;
@@ -22,8 +52,8 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
     let cHP = cpu.hp || 0;
     const pWinE = player.winE || 10;
     const cWinE = cpu.winE || 10;
-    const pEffects = [...player.effects];
-    const cEffects = [...cpu.effects];
+    const pEffects = [...(player.effects || [])];
+    const cEffects = [...(cpu.effects || [])];
 
     // 1. Cost consumption
     if (playerMove === 'CHARGE') pEnergy -= pChgC;
@@ -35,117 +65,101 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
     if (cpuMove === 'CHARGE') cEnergy -= cChgC;
     if (cpuMove === 'GUARD') cEnergy -= cGrdC;
 
-    let playerBehavior = playerMove;
-    if (playerMove === 'SKILL' && playerSkill) playerBehavior = playerSkill.category;
+    const vals = isSkill ? getSkillValues(playerSkill, player.skillEffectBonus || 0) : [];
+    const [val1, val2] = vals;
+    let pDmgTaken = 0, cDmgTaken = 0;
 
     // 2. Skill Effects (Execution Phase)
-    if (playerMove === 'SKILL' && playerSkill) {
-        const skillEffectBonus = player.skillEffectBonus || 0;
-        const effectValues = playerSkill.effectValues.map(v => Math.max(1, v + skillEffectBonus));
-        const [val1, val2] = effectValues;
-
+    if (isSkill) {
         switch (playerSkill.id) {
             case 'CONVERT': pHP = Math.max(0, pHP - val1); pEnergy += val2; break;
             case 'DRAIN': cEnergy = Math.max(0, cEnergy - val1); break;
             case 'SNATCH': {
-                const stolen = Math.min(cEnergy, val1);
+                const stolen = Math.min(Math.max(0, cEnergy), val1);
                 cEnergy -= stolen;
                 pEnergy += stolen;
+                cDmgTaken += (val2 || 0);
                 break;
-            } // New (True Steal)
-            case 'HEAL': pHP = Math.min(player.maxHp || 999, pHP + val1); break; // New (Capped at MaxHP)
+            }
+            case 'HEAL': pHP = Math.min(player.maxHp || 999, pHP + val1); break;
             case 'INSPIRE': pEffects.push({ type: 'ATK_UP', amount: val2, turns: val1 + 1 }); break;
             case 'FOCUS': pEffects.push({ type: 'CHGE_UP', amount: val2, turns: val1 + 1 }); break;
             case 'WEAKEN': if (cpuMove === 'ATTACK') { cEffects.push({ type: 'ATK_DOWN', amount: val2, turns: val1 + 1 }); } break;
             case 'JAMMING': cEffects.push({ type: 'CHGE_DOWN', amount: val2, turns: val1 + 1 }); break;
             case 'BARRIER': pEffects.push({ type: 'DMG_REDUCE', amount: val2, turns: val1 + 1 }); break;
-            case 'PARALYZE': if (cpuMove === 'GUARD') { cEffects.push({ type: 'GRDC_UP', amount: val1, turns: 3 }); } break;
+            case 'PARALYZE': if (cpuMove === 'GUARD') { cEffects.push({ type: 'GRDC_UP', amount: val2, turns: val1 + 1 }); } break;
             case 'POISON': if (cpuMove !== 'GUARD') { cEffects.push({ type: 'POISON', trigger: val1, damage: val2, turns: 99 }); } break;
-            case 'DOOM': cEffects.push({ type: 'DOOM', damage: val2, turns: val1 }); break; // New (Correct timing)
+            case 'DOOM': cEffects.push({ type: 'DOOM', damage: val2, turns: val1 }); break;
             case 'CURSE': cEffects.push({ type: 'BIND', amount: 0, turns: val1 }); break;
-            case 'ZERO_FORM': pEnergy += val1; pEffects.push({ type: 'GUARD_SEAL', amount: 0, turns: val2 }); break;
+            case 'ZERO_FORM': pEnergy += val1; pEffects.push({ type: 'GUARD_SEAL', amount: 0, turns: val2 + 1 }); break;
             case 'GRAVITY_ZONE':
-                pEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 });
-                cEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 });
+                pEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 + 1 });
+                cEffects.push({ type: 'SKILL_SEAL', amount: 0, turns: val1 + 1 });
+                cEffects.push({ type: 'ATK_DOWN', amount: val2, turns: val1 + 1 });
+                cEffects.push({ type: 'CHGE_DOWN', amount: val2, turns: val1 + 1 });
                 break;
-            case 'MIRAGE':
+            case 'MIRAGE': {
                 const mirageMult = playerSkill.rarity === 'LEGENDARY' ? 0.5 : 1.0;
                 pEffects.push({ type: 'INVINCIBLE_STORE', stored: 0, amount: mirageMult, turns: val1 });
                 break;
-            case 'PHANTOM_STEP': pEffects.push({ type: 'DOUBLE_ACTION', amount: 0, turns: val1 }); break;
+            }
+            case 'PHANTOM_STEP': pEffects.push({ type: 'DOUBLE_ACTION', amount: 0, turns: val1 + 1 }); break;
+            case 'GAMBLER': {
+                const minFn = playerSkill.rarity === 'LEGENDARY' ? 5 : 1;
+                const roll = Math.floor(Math.random() * (10 - minFn + 1)) + minFn;
+                pEnergy += roll;
+                if (roll % 2 !== 0) pHP = Math.max(0, pHP - 2);
+                break;
+            }
         }
     }
 
-    // 2.5 Special Charge Skills (GAMBLER logic)
-    if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'GAMBLER') {
-        const isLegendary = playerSkill.rarity === 'LEGENDARY';
-        const minFn = isLegendary ? 5 : 1;
-        const roll = Math.floor(Math.random() * (10 - minFn + 1)) + minFn;
-        pEnergy += roll;
-        if (roll % 2 !== 0) {
-            pHP = Math.max(0, pHP - 2);
-        }
-    }
-
-    // 3. Charging
-    if (playerBehavior === 'CHARGE') {
-        const chargeAmount = pChgE;
-        pEnergy += chargeAmount;
-        const poisonEffect = player.effects.find(e => e.type === 'POISON');
-        if (poisonEffect && chargeAmount >= poisonEffect.trigger) {
-            pHP -= poisonEffect.damage;
-        }
-    }
-    if (cpuMove === 'CHARGE') {
-        const chargeAmount = cChgE;
-        cEnergy += chargeAmount;
-        const poisonEffect = cpu.effects.find(e => e.type === 'POISON');
-        if (poisonEffect && chargeAmount >= poisonEffect.trigger) {
-            cHP -= poisonEffect.damage;
-        }
-    }
+    // 3. Charging（通常のチャージコマンドのみ。CHARGE系スキルは通常チャージを伴わない）
+    const pCharged = playerMove === 'CHARGE';
+    const cCharged = cpuMove === 'CHARGE';
+    if (pCharged) pEnergy += pChgE;
+    if (cCharged) cEnergy += cChgE;
+    pHP -= applyPoison(player.effects || [], pCharged, pChgE);
+    cHP -= applyPoison(cpu.effects || [], cCharged, cChgE);
 
     pEnergy = Math.max(0, Math.min(pEnergy, pWinE));
     cEnergy = Math.max(0, Math.min(cEnergy, cWinE));
 
     // 4. Damage Calculation
-    let pDmgTaken = 0, cDmgTaken = 0;
-    if (playerBehavior === 'ATTACK') {
-        if (cpuMove === 'CHARGE') cDmgTaken += pAtk;
+    if (playerMove === 'ATTACK') {
+        if (cpuMove === 'CHARGE' || cpuMove === 'SKIP') cDmgTaken += pAtk;
         else if (cpuMove === 'ATTACK') {
+            // 同じATKなら相殺（仕様）
             if (pAtk > cAtk) cDmgTaken += pAtk;
             else if (cAtk > pAtk) pDmgTaken += cAtk;
         }
-        else if (cpuMove === 'SKIP') cDmgTaken += pAtk; // CPU takes full damage
-    }
-    // CHARGE系とSPECIAL系スキルは相手の攻撃を受ける
-    else if (playerBehavior === 'CHARGE' || playerBehavior === 'SPECIAL') {
+    } else if (playerMove === 'CHARGE') {
         if (cpuMove === 'ATTACK') pDmgTaken += cAtk;
-    }
-    // GUARD系スキルは相手の攻撃を防ぐ（ダメージを受けない）
+    } else if (isSkill) {
+        // GUARD系スキルのみ相手の攻撃を防ぐ。それ以外のスキルは無防備
+        if (playerSkill.category !== 'GUARD' && cpuMove === 'ATTACK') pDmgTaken += cAtk;
 
-    if (playerMove === 'SKILL' && playerSkill) {
-        const skillEffectBonus = player.skillEffectBonus || 0;
-        const effectValues = playerSkill.effectValues.map(v => Math.max(1, v + skillEffectBonus));
-        const [val1] = effectValues;
         switch (playerSkill.id) {
             case 'SHOCK': cDmgTaken += val1; break;
-            case 'ASSAULT': if (cpuMove === 'GUARD') pDmgTaken += val1; else cDmgTaken += val1; break;
+            case 'ASSAULT':
+                if (cpuMove === 'GUARD') { if (playerSkill.rarity !== 'LEGENDARY') pDmgTaken += 1; }
+                else cDmgTaken += val1;
+                break;
             case 'PIERCE': if (cpuMove === 'GUARD') cDmgTaken += val1; break;
-            case 'COUNTER': if (cpuMove === 'ATTACK') cDmgTaken += cAtk; break;
-            case 'OVERCLOCK':
-                // Uses CURRENT pEnergy (which was updated in step 1/3) ??
-                // Logic step: Cost consumed at step 1. But 'OVERCLOCK' is ATTACK type. 
-                // So energy is consumed... wait. 
-                // If it's SKILL, cost is consumed.
-                // The description says "Damage equal to CURRENT Energy".
-                // Should use the energy AFTER cost consumption.
-                // Note: user asked for "Cost 2". So if I have 5, pay 2 -> 3. Damage = 3?
-                // Or damage = 5? Usually "Current" implies "at moment of impact".
-                // I'll use the current 'pEnergy' variable which reflects cost consumption.
+            case 'VAMPIRE': if (cpuMove !== 'GUARD') cDmgTaken += pAtk; break;
+            case 'COUNTER':
+                if (cpuMove === 'ATTACK') {
+                    if (playerSkill.rarity === 'COMMON') cDmgTaken += val1;
+                    else if (playerSkill.rarity === 'RARE') cDmgTaken += pAtk;
+                    else if (playerSkill.rarity === 'EPIC') cDmgTaken += cAtk;
+                    else cDmgTaken += cAtk + 1;
+                }
+                break;
+            case 'OVERCLOCK': {
                 const multiplier = playerSkill.rarity === 'LEGENDARY' ? 1.5 : 1.0;
                 cDmgTaken += Math.floor(pEnergy * multiplier);
                 break;
+            }
         }
     }
 
@@ -153,21 +167,16 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
     pDmgTaken = Math.max(0, pDmgTaken - (player.tempDmgReduce || 0));
     cDmgTaken = Math.max(0, cDmgTaken - (cpu.tempDmgReduce || 0));
 
-    // MIRAGE (Invincible Store) Logic
+    // MIRAGE (Invincible Store)
     const invincibleEffect = pEffects.find(e => e.type === 'INVINCIBLE_STORE');
-    if (invincibleEffect) {
-        if (pDmgTaken > 0) {
-            invincibleEffect.stored = (invincibleEffect.stored || 0) + pDmgTaken;
-            pDmgTaken = 0; // Nullify damage now
-        }
+    if (invincibleEffect && pDmgTaken > 0) {
+        invincibleEffect.stored = (invincibleEffect.stored || 0) + pDmgTaken;
+        pDmgTaken = 0;
     }
 
-    // Post-Damage Calculation (VAMPIRE)
-    if (playerMove === 'SKILL' && playerSkill && playerSkill.id === 'VAMPIRE') {
-        const skillEffectBonus = player.skillEffectBonus || 0;
-        const effectValues = playerSkill.effectValues.map(v => Math.max(1, v + skillEffectBonus));
-        const [rate] = effectValues; // rate is percentage (e.g. 50)
-        const healAmount = Math.floor(cDmgTaken * (rate / 100));
+    // VAMPIRE: 実際に与えたダメージから回復
+    if (isSkill && playerSkill.id === 'VAMPIRE') {
+        const healAmount = Math.floor(cDmgTaken * (val1 / 100));
         pHP = Math.min(player.maxHp || 999, pHP + healAmount);
     }
 
@@ -179,15 +188,11 @@ export function calculateTurnResult(player, cpu, playerMove, cpuMove, playerSkil
     };
 }
 
-export function updateEffects(effects) {
-    const nextEffects = effects.map(e => ({ ...e, turns: e.turns - 1 }));
-    const active = nextEffects.filter(e => e.turns > 0);
-    const expired = nextEffects.filter(e => e.turns <= 0);
-
+export function calcEffectTotals(effects) {
     const totals = {
         tempAtk: 0, tempGrdC: 0, tempChgE: 0, tempChgC: 0, tempDmgReduce: 0
     };
-    active.forEach(effect => {
+    (effects || []).forEach(effect => {
         if (effect.type === 'ATK_UP') totals.tempAtk += effect.amount;
         if (effect.type === 'ATK_DOWN') totals.tempAtk -= effect.amount;
         if (effect.type === 'GRDC_UP') totals.tempGrdC += effect.amount;
@@ -196,7 +201,18 @@ export function updateEffects(effects) {
         if (effect.type === 'CHARGE_COST_UP') totals.tempChgC += effect.amount;
         if (effect.type === 'DMG_REDUCE') totals.tempDmgReduce += effect.amount;
     });
-    return { effects: active, expired, totals };
+    return totals;
+}
+
+/**
+ * ターン終了時に呼ぶ。残りターンを1減らし、切れた効果を expired で返す。
+ * totals は「次のターン」に有効な補正値。
+ */
+export function updateEffects(effects) {
+    const nextEffects = (effects || []).map(e => ({ ...e, turns: e.turns - 1 }));
+    const active = nextEffects.filter(e => e.turns > 0);
+    const expired = nextEffects.filter(e => e.turns <= 0);
+    return { effects: active, expired, totals: calcEffectTotals(active) };
 }
 
 export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory, cpuHistory }) {
@@ -227,51 +243,57 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
         if (canCAttack) weights.ATTACK += 20;
     }
 
-    if (cCanKillP) weights.ATTACK += 200;
+    // AIレベルごとの賢さ
+    const level = ['EASY', 'NORMAL', 'HARD', 'EXPERT'].includes(aiLevel) ? aiLevel : 'NORMAL';
+    const smart = { EASY: 0.4, NORMAL: 1, HARD: 1.3, EXPERT: 1.6 }[level];
 
-    if (pCanKillC) {
-        if (canCGuard) weights.GUARD += 150;
-        else if (canCAttack && cAtk >= pAtk) weights.ATTACK += 100;
+    if (cCanKillP) weights.ATTACK += Math.round(200 * smart);
+
+    if (pCanKillC && level !== 'EASY') {
+        if (canCGuard) weights.GUARD += Math.round(150 * smart);
+        else if (canCAttack && cAtk >= pAtk) weights.ATTACK += Math.round(100 * smart);
     }
 
     if (cEnergy + cChgE >= cWinLimit && !pCanKillC) {
-        if (canCCharge) weights.CHARGE += 150;
+        if (canCCharge) weights.CHARGE += Math.round(150 * smart);
     }
 
-    // History Analysis
-    if (playerHistory && playerHistory.length >= 3) {
+    // History Analysis（NORMAL以上）
+    if (level !== 'EASY' && playerHistory && playerHistory.length >= 3) {
+        const histMult = (level === 'NORMAL') ? 0.5 : smart;
         const lastMove = playerHistory[playerHistory.length - 1];
         const last3 = playerHistory.slice(-3);
         const isSpamming = last3.every(m => m === lastMove);
 
-        // Pattern: Detect Spamming
         if (isSpamming) {
-            if (lastMove === 'CHARGE') weights.ATTACK += 50;
-            if (lastMove === 'ATTACK') weights.GUARD += 50;
-            if (lastMove === 'GUARD') weights.CHARGE += 50;
+            if (lastMove === 'CHARGE' && canCAttack) weights.ATTACK += Math.round(50 * histMult);
+            if (lastMove === 'ATTACK' && canCGuard) weights.GUARD += Math.round(50 * histMult);
+            if (lastMove === 'GUARD' && canCCharge) weights.CHARGE += Math.round(50 * histMult);
         }
 
-        // Pattern: Frequency Analysis
         const total = playerHistory.length;
         const counts = playerHistory.reduce((acc, m) => { acc[m] = (acc[m] || 0) + 1; return acc; }, {});
 
         if ((counts['ATTACK'] || 0) / total > 0.6) {
-            weights.GUARD += 30;
-            weights.ATTACK += 20;
+            if (canCGuard) weights.GUARD += Math.round(30 * histMult);
+            if (canCAttack) weights.ATTACK += Math.round(20 * histMult);
         }
-        if ((counts['GUARD'] || 0) / total > 0.6) {
-            weights.CHARGE += 40;
+        if ((counts['GUARD'] || 0) / total > 0.6 && canCCharge) {
+            weights.CHARGE += Math.round(40 * histMult);
         }
-        if ((counts['CHARGE'] || 0) / total > 0.6) {
-            weights.ATTACK += 40;
+        if ((counts['CHARGE'] || 0) / total > 0.6 && canCAttack) {
+            weights.ATTACK += Math.round(40 * histMult);
         }
     }
 
-    if (aiLevel === 'HARD' || gameMode === 'tower') {
-        const boost = (aiLevel === 'HARD') ? 20 : Math.min(40, floor * 2);
-        if (cpu.chgE >= 3) weights.CHARGE += (30 + boost);
-        if (cpu.atk >= 4) weights.ATTACK += (20 + boost);
-        if (cpu.grdC === 0) weights.GUARD += (20 + boost);
+    // キャラ特性を活かす（HARD以上、またはタワーの深層）
+    if (level === 'HARD' || level === 'EXPERT' || gameMode === 'tower') {
+        let boost = { EASY: 0, NORMAL: 0, HARD: 20, EXPERT: 40 }[level];
+        if (gameMode === 'tower') boost += Math.min(20, (floor || 0));
+        if (level === 'EASY') boost = Math.floor(boost / 2);
+        if (cpu.chgE >= 3 && weights.CHARGE > 0) weights.CHARGE += (30 + boost);
+        if (cpu.atk >= 4 && weights.ATTACK > 0) weights.ATTACK += (20 + boost);
+        if (cpu.grdC === 0 && weights.GUARD > 0) weights.GUARD += (20 + boost);
     }
 
     let pool = [];
@@ -282,7 +304,7 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
     if (pool.length === 0) return 'CHARGE';
 
     // 呪縛(BIND)チェック: 直前の行動を禁止
-    const isBound = cpu.effects.some(e => e.type === 'BIND');
+    const isBound = (cpu.effects || []).some(e => e.type === 'BIND');
     if (isBound && cpuHistory && cpuHistory.length > 0) {
         const lastMove = cpuHistory[cpuHistory.length - 1];
         // poolからlastMoveを除外
@@ -314,10 +336,14 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
 
 }
 
-export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor, difficulty = 'NORMAL') {
+export function isBossFloor(floor) {
+    return floor > 0 && floor % BOSS_INTERVAL === 0;
+}
+
+export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor, difficulty = 'NORMAL', options = {}) {
     let baseCpu;
     let aiLevel = 'EASY';
-    const isBoss = (floor > 0 && floor % 5 === 0);
+    const isBoss = (options.isBoss !== undefined) ? options.isBoss : isBossFloor(floor);
 
     if (floor === 0) {
         baseCpu = JSON.parse(JSON.stringify(TREASURE_MONSTER));
@@ -424,11 +450,12 @@ export function generateTowerEnemy(floor, mobDeck, bossDeck, isTreasureFloor, di
     if (passiveType !== 'NONE') {
         const selfBuffIds = ['FIRST_STRIKE', 'IRON_CLAD', 'WAR_CRY', 'FOCUS', 'VITALITY'];
         const debuffIds = ['LIFE_CUT', 'SLUGGISH', 'LONG_ROAD', 'SILENCE', 'HEAVY_WEIGHT', 'LEAK'];
+        const anyIds = [...selfBuffIds, ...debuffIds, 'CURSED_BODY']; // SELF_DESTRUCT は宝箱専用
 
         let pool = [];
         if (passiveType === 'SELF') pool = PASSIVE_SKILLS.filter(p => selfBuffIds.includes(p.id));
         else if (passiveType === 'DEBUFF') pool = PASSIVE_SKILLS.filter(p => debuffIds.includes(p.id));
-        else pool = PASSIVE_SKILLS;
+        else pool = PASSIVE_SKILLS.filter(p => anyIds.includes(p.id));
 
         if (pool.length > 0) {
             const passive = pool[Math.floor(Math.random() * pool.length)];

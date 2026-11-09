@@ -145,9 +145,10 @@ export function updateUI() {
         playerIconHtml += `<div class="absolute -top-2 -left-2 bg-emerald-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-4 border-slate-900 z-10 shadow-lg">${gameState.lives}</div>`;
     }
     const pic = document.getElementById('player-icon-container');
-    if (pic.innerHTML !== playerIconHtml) {
+    if (pic && pic.innerHTML !== playerIconHtml) {
         pic.innerHTML = playerIconHtml;
-        document.getElementById('player-name-label').innerText = player.name;
+        const nameLabel = document.getElementById('player-name-label');
+        if (nameLabel) nameLabel.innerText = player.name;
         if (window.lucide) window.lucide.createIcons();
     }
 

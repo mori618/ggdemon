@@ -37,10 +37,10 @@ export const SKILLS = [
     { id: 'ASSAULT', rarity: 'LEGENDARY', name: '強襲', category: 'ATTACK', description: '敵に ? ダメージ。', cost: 1, effectValues: [6] },
 
     // SNATCH (強奪)
-    { id: 'SNATCH', rarity: 'COMMON', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪う。', cost: 4, effectValues: [1] },
-    { id: 'SNATCH', rarity: 'RARE', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪い、敵に 1 ダメージ。', cost: 3, effectValues: [1] },
-    { id: 'SNATCH', rarity: 'EPIC', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪い、敵に 1 ダメージ。', cost: 2, effectValues: [2] },
-    { id: 'SNATCH', rarity: 'LEGENDARY', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪い、敵に 2 ダメージ。', cost: 1, effectValues: [3] },
+    { id: 'SNATCH', rarity: 'COMMON', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪う。', cost: 4, effectValues: [1, 0] },
+    { id: 'SNATCH', rarity: 'RARE', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪い、敵に 1 ダメージ。', cost: 3, effectValues: [1, 1] },
+    { id: 'SNATCH', rarity: 'EPIC', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪い、敵に 1 ダメージ。', cost: 2, effectValues: [2, 1] },
+    { id: 'SNATCH', rarity: 'LEGENDARY', name: '強奪', category: 'ATTACK', description: '敵のエナジーを ? 奪い、敵に 2 ダメージ。', cost: 1, effectValues: [3, 2] },
 
     // COUNTER (カウンター)
     { id: 'COUNTER', rarity: 'COMMON', name: 'カウンター', category: 'GUARD', description: 'ガードを行う。敵攻撃時、敵に ? ダメージ。', cost: 3, effectValues: [1] },
@@ -107,9 +107,9 @@ export const SKILLS = [
     { id: 'SHOCK', rarity: 'LEGENDARY', name: '衝撃', category: 'ATTACK', description: '敵の行動に関わらず、固定で ? ダメージ与える。', cost: 2, effectValues: [5] },
 
     // VAMPIRE (吸血)
-    { id: 'VAMPIRE', rarity: 'RARE', name: '吸血', category: 'ATTACK', description: '与えたダメージの ?% を回復する。', cost: 4, effectValues: [100] },
-    { id: 'VAMPIRE', rarity: 'EPIC', name: '吸血', category: 'ATTACK', description: '与えたダメージの ?% を回復する。', cost: 3, effectValues: [150] },
-    { id: 'VAMPIRE', rarity: 'LEGENDARY', name: '吸血', category: 'ATTACK', description: '与えたダメージの ?% を回復する。', cost: 2, effectValues: [300] },
+    { id: 'VAMPIRE', rarity: 'RARE', name: '吸血', category: 'ATTACK', description: 'ATK分の攻撃(ガードで無効)を行い、与えたダメージの ?% を回復する。', cost: 4, effectValues: [100] },
+    { id: 'VAMPIRE', rarity: 'EPIC', name: '吸血', category: 'ATTACK', description: 'ATK分の攻撃(ガードで無効)を行い、与えたダメージの ?% を回復する。', cost: 3, effectValues: [150] },
+    { id: 'VAMPIRE', rarity: 'LEGENDARY', name: '吸血', category: 'ATTACK', description: 'ATK分の攻撃(ガードで無効)を行い、与えたダメージの ?% を回復する。', cost: 2, effectValues: [300] },
 
     // FOCUS (集中)
     { id: 'FOCUS', rarity: 'RARE', name: '集中', category: 'CHARGE', description: '? ターンの間、自分のチャージ増加量を +2。', cost: 3, effectValues: [3, 2] },
@@ -119,7 +119,7 @@ export const SKILLS = [
     // POISON (毒)
     { id: 'POISON', rarity: 'RARE', name: '毒', category: 'SPECIAL', description: '非ガード時に付与。自分が ? エネルギー貯めるたび相手に 1 ダメージ。', cost: 4, effectValues: [2, 1] },
     { id: 'POISON', rarity: 'EPIC', name: '毒', category: 'SPECIAL', description: '非ガード時に付与。自分が ? エネルギー貯めるたび相手に 1 ダメージ。', cost: 3, effectValues: [1, 1] },
-    { id: 'POISON', rarity: 'LEGENDARY', name: '毒', category: 'SPECIAL', description: '非ガード時に付与。行動を選択するたびに 2 ダメージを与える猛毒。', cost: 2, effectValues: [0, 2] }, // 0 trigger means "Every Action"
+    { id: 'POISON', rarity: 'LEGENDARY', name: '毒', category: 'SPECIAL', description: '非ガード時に付与。毎ターン 2 ダメージを与える猛毒。', cost: 2, effectValues: [0, 2] }, // 0 trigger means "Every Action"
 
     // DOOM (死の宣告)
     { id: 'DOOM', rarity: 'RARE', name: '死の宣告', category: 'SPECIAL', description: '? ターン後に 6 ダメージを与える時限爆弾を付与。', cost: 4, effectValues: [4, 6] },
@@ -139,8 +139,8 @@ export const SKILLS = [
     { id: 'MIRAGE', rarity: 'LEGENDARY', name: '砂上の楼閣', category: 'GUARD', description: '3ターン無敵。終了時、受けたダメージの半量を受ける。', cost: 3, effectValues: [3] },
 
     // GRAVITY ZONE (重力圏) - EPIC/LEGENDARY
-    { id: 'GRAVITY_ZONE', rarity: 'EPIC', name: '重力圏', category: 'SPECIAL', description: '5ターンの間、お互いに「スキル」使用不可。', cost: 5, effectValues: [5] },
-    { id: 'GRAVITY_ZONE', rarity: 'LEGENDARY', name: '重力圏', category: 'SPECIAL', description: '3ターンの間、お互いに「スキル」使用不可。', cost: 4, effectValues: [3] },
+    { id: 'GRAVITY_ZONE', rarity: 'EPIC', name: '重力圏', category: 'SPECIAL', description: '? ターンの間、お互いに「スキル」使用不可。敵のATKとChgEを -1。', cost: 5, effectValues: [5, 1] },
+    { id: 'GRAVITY_ZONE', rarity: 'LEGENDARY', name: '重力圏', category: 'SPECIAL', description: '? ターンの間、お互いに「スキル」使用不可。敵のATKとChgEを -2。', cost: 4, effectValues: [5, 2] },
 
     // GAMBLER'S DICE (博打打ちの賽) - EPIC/LEGENDARY
     { id: 'GAMBLER', rarity: 'EPIC', name: '博打打ちの賽', category: 'CHARGE', description: '1~10のランダムチャージ。奇数ならHP-2。', cost: 0, effectValues: [] },
@@ -205,6 +205,8 @@ export const EFFECT_ICONS = {
 
 };
 
+export const BOSS_INTERVAL = 7; // タワーのボスは7階ごと
+
 export const GAME_MODES = {
     NORMAL: 'normal',
     TOWER: 'tower',
@@ -229,8 +231,8 @@ export const PASSIVE_SKILLS = [
     { id: 'FOCUS', name: '集中', apply: (cpu, player) => { cpu.effects.push({ type: 'CHGE_UP', amount: 1, turns: 3 }); }, description: '開幕3ターンChgE+1' },
     { id: 'VITALITY', name: '活力', apply: (cpu, player) => { cpu.hp += 5; }, description: '最大HP+5' },
     // Debuff Skills
-    { id: 'LIFE_CUT', name: '命削り', apply: (cpu, player) => { player.hp = Math.floor(player.hp * 0.7); }, description: 'プレイヤーHP3割減' },
-    { id: 'SLUGGISH', name: '停滞', apply: (cpu, player) => { player.chgE = Math.floor(player.chgE * 0.7); }, description: 'プレイヤーChgE3割減' },
+    { id: 'LIFE_CUT', name: '命削り', apply: (cpu, player) => { player.hp = Math.max(1, Math.floor(player.hp * 0.7)); }, description: 'プレイヤーHP3割減' },
+    { id: 'SLUGGISH', name: '停滞', apply: (cpu, player) => { player.chgE = Math.max(1, Math.floor(player.chgE * 0.7)); }, description: 'プレイヤーChgE3割減' },
     { id: 'LONG_ROAD', name: '長き道', apply: (cpu, player) => { player.winE = Math.floor(player.winE * 1.5); }, description: 'プレイヤーWinE1.5倍' },
     { id: 'SILENCE', name: '沈黙', apply: (cpu, player) => { player.effects.push({ type: 'SKILL_SEAL', amount: 0, turns: 3 }); }, description: '3ターンスキル不可' },
     { id: 'HEAVY_WEIGHT', name: '重枷', apply: (cpu, player) => { player.atkC += 1; }, description: 'プレイヤー攻撃コスト+1' },
