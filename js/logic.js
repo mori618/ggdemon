@@ -1,4 +1,5 @@
 import { CHARACTERS, BOSS_CHARACTERS, TREASURE_MONSTER, ENEMY_TRAITS, PASSIVE_SKILLS, BOSS_INTERVAL } from './constants.js';
+import { getNashStrategy, sampleAction } from './nashAI.js';
 
 /**
  * Battle Charge core game logic.
@@ -216,6 +217,16 @@ export function updateEffects(effects) {
 }
 
 export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory, cpuHistory }) {
+    // MASTER: ゲーム理論（ナッシュ均衡）で手を選ぶ最強AI
+    if (aiLevel === 'MASTER') {
+        const isBound = (cpu.effects || []).some(e => e.type === 'BIND');
+        const forbidden = (isBound && cpuHistory && cpuHistory.length) ? [cpuHistory[cpuHistory.length - 1]] : [];
+        const nash = getNashStrategy({ cpu, player, cHP, cEnergy, pHP, pEnergy, forbidden });
+        if (nash) return sampleAction(nash.strategy);
+        // 状態数が多すぎて解けない場合は EXPERT のロジックで代用
+        aiLevel = 'EXPERT';
+    }
+
     const pAtk = player.atk + (player.tempAtk || 0);
     const cAtk = cpu.atk + (cpu.tempAtk || 0);
     const cGrdC = Math.max(0, cpu.grdC + (cpu.tempGrdC || 0));

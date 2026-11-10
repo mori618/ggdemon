@@ -46,3 +46,19 @@ describe('getNashStrategy', () => {
         expect(r.strategy.ATTACK).toBeUndefined();
     });
 });
+
+describe('getCpuMoveLogic (MASTER)', async () => {
+    const { getCpuMoveLogic } = await import('../js/logic.js');
+    const base = (over) => ({
+        player: { ...C.NORMAL }, cpu: { ...C.NORMAL, effects: [] },
+        pEnergy: 0, cEnergy: 4, cHP: 3, pHP: 3, aiLevel: 'MASTER',
+        gameMode: 'normal', floor: 0, playerHistory: [], cpuHistory: [], ...over
+    });
+    it('勝ちが確定する局面では必ずその手を選ぶ', () => {
+        for (let i = 0; i < 20; i++) expect(getCpuMoveLogic(base())).toBe('CHARGE');
+    });
+    it('呪縛(BIND)中は直前の行動を選ばない', () => {
+        const args = base({ cpu: { ...C.NORMAL, effects: [{ type: 'BIND', turns: 2 }] }, cpuHistory: ['CHARGE'] });
+        for (let i = 0; i < 20; i++) expect(getCpuMoveLogic(args)).not.toBe('CHARGE');
+    });
+});

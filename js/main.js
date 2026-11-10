@@ -162,7 +162,7 @@ window.goToSelection = (mode) => {
 window.setAiLevel = (lv) => {
     sound.playSE('click');
     gameState.aiLevel = lv;
-    ['EASY', 'NORMAL', 'HARD'].forEach(l => {
+    ['EASY', 'NORMAL', 'HARD', 'MASTER'].forEach(l => {
         document.getElementById(`lvl-${l}`).classList.toggle('selected', l === lv);
     });
 };
