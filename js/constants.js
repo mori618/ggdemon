@@ -210,18 +210,7 @@ export const BOSS_INTERVAL = 7; // タワーのボスは7階ごと
 export const GAME_MODES = {
     NORMAL: 'normal',
     TOWER: 'tower',
-    ONLINE_HOST: 'online_host',
-    ONLINE_CLIENT: 'online_client'
-};
-
-export const NETWORK_EVENTS = {
-    CONNECTED: 'CONNECTED',
-    READY: 'READY',
-    CHAR_SELECT: 'CHAR_SELECT',
-    MOVE_COMMIT: 'MOVE_COMMIT',
-    MOVE_REVEAL: 'MOVE_REVEAL',
-    SYNC_STATE: 'SYNC_STATE',
-    CHAT: 'CHAT'
+    ONLINE: 'online'
 };
 
 export const PASSIVE_SKILLS = [

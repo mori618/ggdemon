@@ -1,16 +1,17 @@
-import { CHARACTERS, GAME_MODES, NETWORK_EVENTS, BOSS_CHARACTERS } from './constants.js';
+import { CHARACTERS, GAME_MODES, BOSS_CHARACTERS } from './constants.js';
 import { downloadLastLog, downloadAllLogs } from './battleLog.js';
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak, Deck, hasSaveData, loadGameState, clearGameState, saveGameState } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
 import { setupBattleState, getCpuMove, executeTurn, generateTowerMap, showMap, resumeGame } from './game.js';
-import { network } from './network.js';
+import { online } from './online/controller.js';
 
 window.onload = () => {
     lucide.createIcons();
     renderChars(handleCharSelect);
     loadHighStreak();
     syncAudioUI();
+    online.init({ showCharSelect: showOnlineCharSelect, closePause: () => { if (gameState.isPaused) window.togglePause(); } });
 
     if (hasSaveData()) {
         const btn = document.getElementById('continue-btn');
@@ -49,76 +50,31 @@ window.debugForceEvent = async () => {
     }
 };
 
-// Online UI Handlers
-window.showOnlineMenu = () => {
-    sound.playSE('click');
+// オンライン対戦（処理の本体は js/online/controller.js）
+window.showOnlineMenu = () => online.openLobby();
+window.exitOnline = () => online.exit();
+window.onlineStart = (mode) => online.start(mode);
+window.onlineShowFriend = () => online.showFriendMenu();
+window.onlineHostRoom = () => online.hostRoom();
+window.onlineShowJoin = () => online.showJoin();
+window.onlineJoinRoom = () => online.joinRoom();
+window.onlineCancel = () => online.cancel();
+window.onlineCopyCode = () => online.copyRoomCode();
+window.onlineEditName = () => online.editName();
+window.onlineShowRanking = () => online.showRanking();
+window.onlineBackToLobby = () => online.backToLobby();
+window.onlineAgain = () => online.again();
+
+// オンライン対戦用のキャラクター選択画面を開く
+function showOnlineCharSelect() {
+    gameState.selectionState = 'PLAYER';
     document.getElementById('title-screen').classList.add('hidden');
-    const onlineScreen = document.getElementById('online-screen');
-    onlineScreen.classList.remove('hidden');
-
-    // Reset to step 1
-    document.getElementById('online-step-1').classList.remove('hidden');
-    document.getElementById('online-step-host').classList.add('hidden');
-    document.getElementById('online-step-client').classList.add('hidden');
-};
-
-window.exitOnline = () => {
-    sound.playSE('click');
     document.getElementById('online-screen').classList.add('hidden');
-    document.getElementById('online-step-connecting').classList.add('hidden');
-    document.getElementById('title-screen').classList.remove('hidden');
-    // Disconnect if active
-    if (network.peer) {
-        network.peer.destroy();
-        network.peer = null;
-    }
-};
-
-window.setupOnline = (role) => {
-    sound.playSE('click');
-    document.getElementById('online-step-1').classList.add('hidden');
-
-    if (role === 'HOST') {
-        document.getElementById('online-step-host').classList.remove('hidden');
-        network.init(true, (id) => {
-            document.getElementById('host-id-display').innerText = id;
-        });
-
-        network.setOnConnect((peerId) => {
-            console.log('Opponent connected:', peerId);
-            gameState.gameMode = GAME_MODES.ONLINE_HOST;
-            gameState.selectionState = 'PLAYER';
-            network.send(NETWORK_EVENTS.CONNECTED, {});
-            goToSelection(GAME_MODES.ONLINE_HOST);
-        });
-    } else {
-        document.getElementById('online-step-client').classList.remove('hidden');
-        // Client peer will be created when joining
-    }
-};
-
-window.joinRoom = () => {
-    const id = document.getElementById('join-id-input').value.trim().toLowerCase();
-    if (!id) return;
-    sound.playSE('click');
-
-    // Show connecting screen
-    document.getElementById('online-step-client').classList.add('hidden');
-    document.getElementById('online-step-connecting').classList.remove('hidden');
-    document.getElementById('connecting-room-id').innerText = id;
-
-    // Initialize peer for client and connect after it's ready
-    network.init(false, () => {
-        network.connect(id);
-    });
-
-    network.setOnConnect((peerId) => {
-        console.log('Connected to host:', peerId);
-        gameState.gameMode = GAME_MODES.ONLINE_CLIENT;
-        gameState.selectionState = 'PLAYER';
-        // Wait for host to send CONNECTED (or sending it ourselves is fine too)
-    });
-};
+    document.getElementById('select-screen').classList.remove('hidden');
+    document.getElementById('difficulty-selector').classList.add('hidden');
+    document.getElementById('select-title').innerText = "Select Your Hero";
+    renderChars(handleCharSelect);
+}
 
 // Global handlers (attached to window for HTML onclick attributes)
 window.toggleMute = () => {
@@ -153,7 +109,6 @@ window.goToSelection = (mode) => {
     gameState.selectionState = 'PLAYER';
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('online-screen').classList.add('hidden');
-    document.getElementById('online-step-connecting').classList.add('hidden');
     document.getElementById('select-screen').classList.remove('hidden');
     document.getElementById('difficulty-selector').classList.add('hidden');
     document.getElementById('select-title').innerText = "Select Your Hero";
@@ -183,6 +138,10 @@ window.togglePause = () => {
     if (gameState.gameOver) return;
     gameState.isPaused = !gameState.isPaused;
     const el = document.getElementById('pause-overlay');
+    // オンライン対戦中はやり直し不可。相手は待ってくれないので持ち時間も止まらない
+    const inOnlineMatch = online.inMatch();
+    document.getElementById('btn-pause-retry').classList.toggle('hidden', inOnlineMatch);
+    document.getElementById('btn-pause-title').innerText = inOnlineMatch ? '降参してタイトルへ' : 'タイトルへ';
     if (gameState.isPaused) {
         el.classList.remove('hidden');
         setTimeout(() => el.classList.add('opacity-100'), 10);
@@ -193,12 +152,17 @@ window.togglePause = () => {
 };
 
 window.retryGame = () => {
+    if (online.isOnlineMode()) return;
     setupBattleState();
     if (gameState.isPaused) window.togglePause();
 };
 
 window.restartApp = () => {
+    if (online.inMatch() && !window.confirm('対戦中です。降参してタイトルに戻りますか？')) return;
+    online.shutdown();
     document.getElementById('result-overlay').classList.add('hidden');
+    document.getElementById('result-overlay').classList.remove('opacity-100');
+    document.getElementById('pause-overlay').classList.remove('opacity-100');
     document.getElementById('pause-overlay').classList.add('hidden');
     document.getElementById('title-screen').classList.remove('hidden');
     gameState.isPaused = false;
@@ -292,24 +256,9 @@ window.selectCommand = (c) => {
 window.confirmCommand = () => {
     if (!gameState.selectedCmd || gameState.isProc) return;
 
-    // Online Battle Handling
-    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-        if (gameState.myMoveCommitted) return; // Prevent double commit
-
-        sound.playSE('ready');
-        gameState.myMoveCommitted = true;
-        gameState.isProc = true; // 確定後はコマンド変更不可
-        document.getElementById('command-wrapper').classList.add('ui-hidden');
-        showCommandDetail(null);
-        setMessage("Waiting for opponent...");
-
-        // 1. Send Commit
-        network.send(NETWORK_EVENTS.MOVE_COMMIT, {});
-
-        // 2. If opponent already committed, we can reveal our move now
-        if (gameState.opponentCommitted) {
-            network.send(NETWORK_EVENTS.MOVE_REVEAL, { move: gameState.selectedCmd });
-        }
+    // オンライン対戦: 手を送信して相手を待つ
+    if (online.isOnlineMode()) {
+        online.submitMove(gameState.selectedCmd);
         return;
     }
 
@@ -328,6 +277,11 @@ window.confirmCommand = () => {
 
 window.backToTitle = () => {
     sound.playSE('click');
+    if (online.isOnlineMode()) {
+        // オンライン対戦のキャラクター選択から戻る → ロビーへ（部屋に入っていれば退出する）
+        online.onBackFromSelect();
+        return;
+    }
     document.getElementById('select-screen').classList.add('hidden');
     document.getElementById('title-screen').classList.remove('hidden');
     gameState.selectionState = 'PLAYER';
@@ -365,19 +319,9 @@ function handleCharSelect(id) {
 function executeCharSelect(id) {
     let selected = (id === 'RANDOM') ? CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)] : CHARACTERS.find(c => c.id === id);
 
-    // Online Config Handling
-    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-        gameState.pChar = JSON.parse(JSON.stringify(selected));
-        // Send selection to opponent
-        network.send(NETWORK_EVENTS.CHAR_SELECT, { charId: selected.id });
-
-        // Show waiting message
-        setMessage("Waiting for opponent...");
-        document.getElementById('select-title').innerText = "Waiting for Opponent...";
-        document.getElementById('char-grid').classList.add('pointer-events-none', 'opacity-50');
-
-        gameState.pSelected = true;
-        checkOnlineStart();
+    // オンライン対戦: 選んだキャラクターを通知して対戦開始を待つ
+    if (online.isOnlineMode()) {
+        online.onCharChosen(selected.id);
         return;
     }
 
@@ -410,60 +354,6 @@ window.cancelDifficultySelection = () => {
     document.getElementById('tower-difficulty-screen').classList.add('hidden');
     document.getElementById('select-screen').classList.remove('hidden');
 };
-
-function checkOnlineStart() {
-    if (gameState.pSelected && gameState.cSelected) {
-        setTimeout(() => {
-            startGame();
-        }, 500);
-    }
-}
-
-// 相手から届いた行動を検証する（不正な値・コスト不足はCHARGE扱い）
-function sanitizeOpponentMove(move) {
-    const c = gameState.cpu;
-    const e = gameState.cEnergy || 0;
-    if (!c) return 'CHARGE';
-    const grdC = Math.max(0, c.grdC + (c.tempGrdC || 0));
-    if (move === 'ATTACK' && e >= c.atkC) return 'ATTACK';
-    if (move === 'GUARD' && e >= grdC) return 'GUARD';
-    return 'CHARGE';
-}
-
-// Network Data Handler
-network.setOnData((data) => {
-    const { type, payload } = data;
-    console.log('CMD RECEIVED:', type, payload);
-
-    if (type === NETWORK_EVENTS.CONNECTED) {
-        if (gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-            goToSelection(GAME_MODES.ONLINE_CLIENT);
-        }
-    }
-    else if (type === NETWORK_EVENTS.CHAR_SELECT) {
-        const charId = payload.charId;
-        const selected = CHARACTERS.find(c => c.id === charId) || CHARACTERS[0]; // Fallback
-        gameState.cChar = selected;
-        gameState.cSelected = true;
-        checkOnlineStart();
-    }
-    else if (type === NETWORK_EVENTS.MOVE_COMMIT) {
-        // Opponent selected a move
-        gameState.opponentCommitted = true;
-        setMessage("Opponent Ready!");
-        // If I have also committed, exchange moves
-        if (gameState.myMoveCommitted) {
-            network.send(NETWORK_EVENTS.MOVE_REVEAL, { move: gameState.selectedCmd });
-        }
-    }
-    else if (type === NETWORK_EVENTS.MOVE_REVEAL) {
-        const opponentMove = sanitizeOpponentMove(payload.move);
-        executeTurn(gameState.selectedCmd, opponentMove);
-        gameState.opponentCommitted = false;
-        gameState.myMoveCommitted = false;
-        // gameState.selectedCmd is cleared in executeTurn
-    }
-});
 
 function startTower(diff = 'NORMAL') {
     gameState.floor = 0;

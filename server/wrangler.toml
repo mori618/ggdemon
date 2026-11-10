@@ -1,0 +1,30 @@
+# GG Demon オンライン対戦サーバー（Cloudflare Workers）
+# デプロイ手順は server/README.md を参照
+name = "ggdemon-online"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+[vars]
+# 接続を許可するサイト（カンマ区切り）。本番ではゲームのURLに絞ることを推奨
+# 例: "https://ggdemon.pages.dev,https://mori618.github.io"
+ALLOWED_ORIGINS = "*"
+
+[[durable_objects.bindings]]
+name = "MATCHMAKER"
+class_name = "Matchmaker"
+
+[[durable_objects.bindings]]
+name = "MATCH_ROOM"
+class_name = "MatchRoom"
+
+# 無料プランで使える SQLite ストレージ方式の Durable Object として登録
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Matchmaker", "MatchRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ggdemon"
+# `npx wrangler d1 create ggdemon` の出力に表示される ID に置き換える
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
