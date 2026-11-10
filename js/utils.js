@@ -74,7 +74,7 @@ const SAVE_KEY = 'ggdemon_save';
 
 export function saveGameState() {
     // オンラインモードはセーブ対象外
-    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) return;
+    if (gameState.gameMode === GAME_MODES.ONLINE) return;
     
     try {
         const data = JSON.stringify(gameState);
@@ -91,7 +91,7 @@ export function loadGameState() {
         
         const parsed = JSON.parse(data);
         // 旧バージョンでセーブされたオンライン対戦は再開しない
-        if (parsed.gameMode === GAME_MODES.ONLINE_HOST || parsed.gameMode === GAME_MODES.ONLINE_CLIENT) {
+        if (typeof parsed.gameMode === 'string' && parsed.gameMode.startsWith('online')) {
             localStorage.removeItem(SAVE_KEY);
             return false;
         }

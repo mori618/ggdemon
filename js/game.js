@@ -3,6 +3,7 @@ import { gameState, saveHighStreak, saveGameState, clearGameState } from './util
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
 import { calculateTurnResult, updateEffects, calcEffectTotals, getCpuMoveLogic, getLastCpuDecision, generateTowerEnemy, isBossFloor } from './logic.js';
+import { judgeOutcome } from './online/pvp.js';
 import { startBattleLog, getCurrentLog, beginTurnLog, addTurnStep, finishTurnLog, markRevived, endBattleLog } from './battleLog.js';
 
 const bumpAiLevel = (lv, dir) => {
@@ -10,6 +11,27 @@ const bumpAiLevel = (lv, dir) => {
     const i = Math.max(0, order.indexOf(lv));
     return order[Math.min(order.length - 1, Math.max(0, i + dir))];
 };
+
+// オンライン対戦の画面制御（js/online/controller.js）から登録されるフック
+export const onlineHooks = {
+    onTurnReady: null, // 次のコマンド入力が可能になった
+    onLocalEnd: null   // 手元の計算で決着がついた（outcome: { winner: 0=自分 | 1=相手 | -1=引き分け, reason }）
+};
+
+const isOnlineMode = () => gameState.gameMode === GAME_MODES.ONLINE;
+
+// オンライン対戦を終了状態にする（降参・切断など、盤面の決着以外で終わる場合にも使う）
+export function endOnlineBattle(resultLabel = 'ENDED', reason = '') {
+    if (gameState.gameOver && !gameState.inBattle) return;
+    gameState.gameOver = true;
+    gameState.inBattle = false;
+    gameState.isProc = true;
+    const dialogOverlay = document.getElementById('battle-dialog-overlay');
+    dialogOverlay.classList.add('opacity-0', 'hidden');
+    document.getElementById('player-card').classList.remove('zone-dim', 'shake');
+    document.getElementById('cpu-card').classList.remove('zone-dim', 'shake');
+    if (getCurrentLog()) endBattleLog(gameState, resultLabel, reason);
+}
 
 export function setupBattleState() {
     gameState.player = JSON.parse(JSON.stringify(gameState.pChar));
@@ -26,8 +48,8 @@ export function setupBattleState() {
     gameState.currentBattle = { isBoss, bonusGold: 0, mod: battleMod };
     let baseCpu;
 
-    if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-        // Online: cChar is set via network sync
+    if (isOnlineMode()) {
+        // オンライン: 相手のキャラクターは通信で受け取って cChar に入っている
         baseCpu = JSON.parse(JSON.stringify(gameState.cChar));
         baseCpu.effects = [];
     } else if (isTower) {
@@ -122,9 +144,9 @@ export function setupBattleState() {
         badge.innerText = badgeText;
         badge.classList.add(...badgeClass.split(' '));
         badge.classList.remove('hidden');
-    } else if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
+    } else if (isOnlineMode()) {
         gameState.playerSkill = null;
-        badge.innerText = "PLAYER 2";
+        badge.innerText = "ONLINE";
         badge.classList.add('bg-blue-600');
         badge.classList.remove('hidden');
     } else {
@@ -265,7 +287,11 @@ export function executeTurn(pM, cM) {
 
     // Hide Ready Button (controlled by disabled state in UI)
 
+    // オンライン対戦が降参・切断などで先に終わっていたら、残りの演出は行わない
+    const aborted = () => isOnlineMode() && gameState.gameOver;
+
     setTimeout(() => {
+        if (aborted()) return;
         // 2. Calculate Result (with Double Action Logic)
         const loops = isDouble ? 2 : 1;
 
@@ -395,6 +421,7 @@ export function executeTurn(pM, cM) {
         pC.classList.remove('zone-dim'); cC.classList.remove('zone-dim');
 
         setTimeout(() => {
+            if (aborted()) return;
             pC.classList.remove('shake'); cC.classList.remove('shake');
 
             // Revival Logic for Tower Mode
@@ -416,6 +443,30 @@ export function executeTurn(pM, cM) {
                     iconContainer.querySelector('.absolute').innerText = String(gameState.lives);
                 }
                 updateUI();
+            }
+
+            // オンライン対戦の勝敗は、どちらの画面でも同じ結論になる左右対称の判定を使う
+            if (isOnlineMode()) {
+                const outcome = judgeOutcome(
+                    { hp: gameState.pHP, energy: gameState.pEnergy, winE: gameState.player.winE },
+                    { hp: gameState.cHP, energy: gameState.cEnergy, winE: gameState.cpu.winE },
+                    gameState.turn
+                );
+                dialogOverlay.classList.add('opacity-0');
+                setTimeout(() => dialogOverlay.classList.add('hidden'), 300);
+                if (outcome) {
+                    const label = outcome.winner === -1 ? 'DRAW' : (outcome.winner === 0 ? 'VICTORY' : 'DEFEAT');
+                    endOnlineBattle(label, outcome.reason);
+                    updateUI();
+                    if (onlineHooks.onLocalEnd) onlineHooks.onLocalEnd(outcome);
+                } else {
+                    gameState.turn++; gameState.isProc = false; gameState.selectedCmd = null;
+                    document.getElementById('command-wrapper').classList.remove('ui-hidden');
+                    updateUI();
+                    setMessage("Command Select");
+                    if (onlineHooks.onTurnReady) onlineHooks.onTurnReady();
+                }
+                return;
             }
 
             const cWinF = (gameState.cEnergy >= gameState.cpu.winE);
@@ -2152,10 +2203,6 @@ export function resumeGame() {
 
             badge.innerText = badgeText;
             badge.classList.add(...badgeClass.split(' '));
-            badge.classList.remove('hidden');
-        } else if (gameState.gameMode === GAME_MODES.ONLINE_HOST || gameState.gameMode === GAME_MODES.ONLINE_CLIENT) {
-            badge.innerText = "PLAYER 2";
-            badge.classList.add('bg-blue-600');
             badge.classList.remove('hidden');
         } else {
             badge.innerText = gameState.aiLevel;

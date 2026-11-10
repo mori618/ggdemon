@@ -34,7 +34,7 @@
             <button id="continue-btn" onclick="continueGame()"
                 class="hidden bg-amber-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase border-b-4 border-amber-800">CONTINUE</button>
             <button onclick="showOnlineMenu()"
-                class="hidden bg-blue-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase border-b-4 border-blue-800">ONLINE
+                class="bg-blue-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase border-b-4 border-blue-800">ONLINE
                 VS</button>
             <button onclick="showTutorial()"
                 class="bg-slate-800 text-slate-300 py-4 rounded-2xl font-black font-orbitron text-lg hover:bg-slate-700 active:scale-95 transition-all uppercase w-full">How
@@ -184,83 +184,113 @@
             </section>
         </div>
     </div>
-    <!-- Screen: Online Connection -->
+    <!-- Screen: Online Lobby -->
     <div id="online-screen"
-        class="fixed inset-0 z-[120] flex flex-col items-center justify-center p-6 bg-slate-950 hidden text-white">
+        class="fixed inset-0 z-[120] flex flex-col items-center overflow-y-auto p-6 bg-slate-950 hidden text-white">
         <h2
-            class="text-3xl font-black font-orbitron text-center mb-8 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent italic tracking-tighter uppercase">
+            class="text-3xl font-black font-orbitron text-center mt-4 mb-6 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent italic tracking-tighter uppercase">
             Online Battle</h2>
 
-        <!-- Step 1: Mode Select -->
-        <div id="online-step-1" class="flex flex-col space-y-4 w-full max-w-[280px]">
-            <button onclick="setupOnline('HOST')"
-                class="bg-emerald-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">Create
-                Room</button>
-            <button onclick="setupOnline('CLIENT')"
-                class="bg-sky-600 text-white py-5 rounded-2xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase">Join
-                Room</button>
+        <!-- Profile -->
+        <div id="online-profile"
+            class="w-full max-w-[320px] bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
+            <div class="flex-1 min-w-0 text-left">
+                <button onclick="onlineEditName()" class="flex items-center gap-2 max-w-full group">
+                    <span id="online-name" class="font-black text-base truncate">Player</span>
+                    <i data-lucide="pencil" class="w-3 h-3 text-slate-500 group-hover:text-sky-400 flex-shrink-0"></i>
+                </button>
+                <div class="text-[10px] text-slate-500 font-bold mt-1">
+                    <span id="online-record"></span> <span id="online-rank" class="text-sky-400"></span>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-[9px] font-black text-slate-500 font-orbitron uppercase tracking-widest">Rating</div>
+                <div id="online-rating" class="font-orbitron font-black text-2xl text-amber-400">----</div>
+            </div>
+        </div>
+
+        <p id="online-notice"
+            class="hidden w-full max-w-[320px] text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-900 rounded-xl p-3 mb-4 text-left">
+        </p>
+
+        <!-- Lobby -->
+        <div id="online-step-lobby" class="flex flex-col space-y-3 w-full max-w-[320px]">
+            <button id="btn-online-ranked" onclick="onlineStart('ranked')" class="bg-amber-500 text-slate-950 py-4 rounded-2xl font-black font-orbitron text-lg hover:scale-105 active:scale-95 transition-all shadow-xl uppercase w-full">Ranked Match
+                <span class="block text-[10px] font-bold normal-case tracking-normal opacity-70">レート戦（勝敗でレートが変動）</span></button>
+            <button id="btn-online-casual" onclick="onlineStart('casual')" class="bg-sky-600 text-white py-4 rounded-2xl font-black font-orbitron text-lg hover:scale-105 active:scale-95 transition-all shadow-xl uppercase w-full">Random Match
+                <span class="block text-[10px] font-bold normal-case tracking-normal opacity-70">ランダムマッチ（レート変動なし）</span></button>
+            <button onclick="onlineShowFriend()" class="bg-emerald-600 text-white py-4 rounded-2xl font-black font-orbitron text-lg hover:scale-105 active:scale-95 transition-all shadow-xl uppercase w-full">Friend Match
+                <span class="block text-[10px] font-bold normal-case tracking-normal opacity-70">フレンド戦（部屋コードで対戦）</span></button>
+            <button id="btn-online-ranking" onclick="onlineShowRanking()"
+                class="bg-slate-900 border border-slate-700 text-amber-300 py-3 rounded-2xl font-bold font-orbitron text-sm hover:bg-slate-800 active:scale-95 transition-all uppercase w-full">Ranking</button>
             <button onclick="exitOnline()"
                 class="bg-slate-800 text-slate-300 py-4 rounded-2xl font-black font-orbitron text-lg hover:bg-slate-700 active:scale-95 transition-all uppercase w-full">Back</button>
         </div>
 
-        <!-- Step 2: Host Waiting -->
-        <div id="online-step-host" class="hidden flex flex-col items-center w-full max-w-md">
-            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Your Room ID</p>
-            <div class="bg-slate-900 border-2 border-blue-500 rounded-xl p-6 mb-6 w-full text-center relative">
-                <span id="host-id-display"
-                    class="font-orbitron text-4xl font-black text-white tracking-widest text-shadow-glow">???</span>
-                <p class="text-[10px] text-slate-500 mt-2">Share this ID with your opponent</p>
+        <!-- Friend: create or join -->
+        <div id="online-step-friend" class="hidden flex flex-col space-y-3 w-full max-w-[320px]">
+            <button onclick="onlineHostRoom()" class="bg-emerald-600 text-white py-4 rounded-2xl font-black font-orbitron text-lg hover:scale-105 active:scale-95 transition-all shadow-xl uppercase w-full">Create Room
+                <span class="block text-[10px] font-bold normal-case tracking-normal opacity-70">部屋を作ってコードを伝える</span></button>
+            <button onclick="onlineShowJoin()" class="bg-sky-600 text-white py-4 rounded-2xl font-black font-orbitron text-lg hover:scale-105 active:scale-95 transition-all shadow-xl uppercase w-full">Join Room
+                <span class="block text-[10px] font-bold normal-case tracking-normal opacity-70">教えてもらったコードで入る</span></button>
+            <button onclick="onlineBackToLobby()"
+                class="bg-slate-800 text-slate-300 py-4 rounded-2xl font-black font-orbitron text-lg hover:bg-slate-700 active:scale-95 transition-all uppercase w-full">Back</button>
+        </div>
+
+        <!-- Friend: host waiting -->
+        <div id="online-step-host" class="hidden flex flex-col items-center w-full max-w-[320px]">
+            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Room Code</p>
+            <div class="bg-slate-900 border-2 border-emerald-500 rounded-xl p-6 mb-3 w-full text-center">
+                <span id="online-room-code" class="font-orbitron text-4xl font-black text-white tracking-[0.3em]">······</span>
+                <p class="text-[10px] text-slate-500 mt-2">このコードを対戦相手に伝えてください</p>
             </div>
+            <button onclick="onlineCopyCode()" class="text-xs font-bold text-sky-400 mb-6 flex items-center gap-1"><i
+                    data-lucide="copy" class="w-3 h-3"></i><span id="online-copy-label">コードをコピー</span></button>
             <div class="flex items-center gap-3 mb-8">
                 <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Waiting for
-                    opponent...</span>
+                <span class="text-xs font-bold text-emerald-400 animate-pulse">相手の入室を待っています…</span>
             </div>
-            <button onclick="exitOnline()"
-                class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+            <button onclick="onlineCancel()" class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
         </div>
 
-        <!-- Step 2: Client Join -->
-        <div id="online-step-client" class="hidden flex flex-col items-center w-full max-w-md">
-            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Enter Room ID</p>
-            <input type="text" id="join-id-input" placeholder="e.g. gg-abcd"
-                class="bg-slate-900 border-2 border-slate-700 rounded-xl p-4 mb-6 w-full text-center font-orbitron text-2xl font-bold text-white focus:border-blue-500 outline-none uppercase placeholder:text-slate-700">
-
-            <button onclick="joinRoom()"
-                class="w-full bg-blue-600 text-white py-4 rounded-xl font-black font-orbitron text-xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase mb-4">Connect</button>
-            <button onclick="exitOnline()"
-                class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+        <!-- Friend: join input -->
+        <div id="online-step-join" class="hidden flex flex-col items-center w-full max-w-[320px]">
+            <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Enter Room Code</p>
+            <input type="text" id="online-join-input" placeholder="ABC234" maxlength="8" autocomplete="off"
+                autocapitalize="characters" onkeydown="if(event.key==='Enter')onlineJoinRoom()"
+                class="bg-slate-900 border-2 border-slate-700 rounded-xl p-4 mb-6 w-full text-center font-orbitron text-2xl font-bold text-white tracking-[0.3em] focus:border-blue-500 outline-none uppercase placeholder:text-slate-700 select-text">
+            <button onclick="onlineJoinRoom()" class="bg-blue-600 text-white py-4 rounded-2xl font-black font-orbitron text-lg hover:scale-105 active:scale-95 transition-all shadow-xl uppercase w-full mb-4">Connect</button>
+            <button onclick="onlineCancel()" class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
         </div>
 
-        <!-- Step 3: Client Connecting -->
-        <div id="online-step-connecting" class="hidden flex flex-col items-center w-full max-w-md">
-            <div class="mb-6">
-                <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
+        <!-- Friend: connecting -->
+        <div id="online-step-connecting" class="hidden flex flex-col items-center w-full max-w-[320px]">
+            <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
             <p class="text-slate-400 font-bold mb-2 uppercase text-xs tracking-widest">Connecting to</p>
-            <p id="connecting-room-id" class="font-orbitron text-2xl font-black text-white mb-6">gg-????</p>
-            <div class="flex items-center gap-3 mb-8">
-                <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                <span class="text-xs font-bold text-blue-400 uppercase tracking-widest animate-pulse">Searching for
-                    opponent...</span>
-            </div>
-            <button onclick="exitOnline()"
-                class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
+            <p id="online-connecting-code" class="font-orbitron text-2xl font-black text-white tracking-[0.3em] mb-8"></p>
+            <button onclick="onlineCancel()" class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
         </div>
 
-        <!-- Diagnostic Logs -->
-        <div class="mt-8 w-full max-w-md">
-            <div class="flex items-center justify-between mb-2 px-2">
-                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest font-orbitron">Network
-                    Logs</span>
-                <button onclick="document.getElementById('online-log').innerHTML = ''"
-                    class="text-[10px] text-blue-500 font-bold uppercase hover:text-blue-400">Clear</button>
-            </div>
-            <div id="online-log"
-                class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 h-32 overflow-y-auto font-mono text-[9px] text-slate-400 space-y-1">
-                <div class="italic text-slate-600">Waiting for activity...</div>
-            </div>
+        <!-- Matchmaking -->
+        <div id="online-step-searching" class="hidden flex flex-col items-center w-full max-w-[320px] mt-8">
+            <div class="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-6"></div>
+            <p id="online-search-mode" class="font-orbitron font-black text-xl uppercase mb-2">Ranked Match</p>
+            <p id="online-search-status" class="text-xs font-bold text-slate-400 mb-2">対戦相手を探しています…</p>
+            <p id="online-search-time" class="font-orbitron text-sm text-slate-500 mb-8">0s</p>
+            <button onclick="onlineCancel()" class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Cancel</button>
         </div>
+
+        <!-- Ranking -->
+        <div id="online-step-ranking" class="hidden flex flex-col items-center w-full max-w-[360px]">
+            <p class="text-slate-400 font-bold mb-3 uppercase text-xs tracking-widest">Ranking Top 50</p>
+            <div id="online-ranking-list" class="w-full space-y-2 mb-6 text-xs text-slate-400"></div>
+            <button onclick="onlineBackToLobby()" class="bg-slate-800 text-slate-300 py-3 px-8 rounded-xl font-black font-orbitron text-sm hover:bg-slate-700 active:scale-95 transition-all uppercase">Back</button>
+        </div>
+    </div>
+
+    <!-- Online: connection status banner -->
+    <div id="online-banner"
+        class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-[140] bg-amber-500 text-slate-950 text-xs font-black px-4 py-2 rounded-full shadow-xl whitespace-nowrap">
     </div>
     <div id="char-status-overlay" onclick="closeStatusOverlay()">
         <div class="status-overlay-content" onclick="event.stopPropagation()">
@@ -290,9 +320,9 @@
             </div>
             <button onclick="togglePause()"
                 class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">続ける</button>
-            <button onclick="retryGame()"
+            <button id="btn-pause-retry" onclick="retryGame()"
                 class="w-full bg-sky-600 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">リトライ</button>
-            <button onclick="restartApp()"
+            <button id="btn-pause-title" onclick="restartApp()"
                 class="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase text-xl active:scale-95">タイトルへ</button>
         </div>
     </div>
@@ -308,7 +338,10 @@
                 <span class="streak-badge text-[10px] font-orbitron uppercase tracking-widest text-amber-400 flex items-center gap-1"><i data-lucide="coins" class="w-3 h-3"></i> <span id="player-gold-val">0</span></span>
             </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+            <div id="online-timer"
+                class="hidden w-10 h-10 flex items-center justify-center bg-slate-900 border-2 border-slate-700 rounded-xl font-orbitron font-black text-sm text-white"
+                title="残り時間（秒）"></div>
             <button id="sound-btn" onclick="toggleMute()"
                 class="p-2 bg-slate-900 border-2 border-slate-800 rounded-xl transition-all"><i id="mute-icon"
                     data-lucide="volume-x" class="w-5 h-5 text-white"></i></button>
@@ -533,6 +566,17 @@
                 </div>
             </div>
 
+            <!-- Online: rating change -->
+            <div id="online-result-box"
+                class="hidden w-full bg-slate-950/50 p-4 rounded-xl border border-slate-800 mb-4 z-10 flex items-center justify-between">
+                <div class="text-left">
+                    <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Rating</div>
+                    <div id="online-result-rating" class="font-orbitron font-black text-lg text-amber-400"></div>
+                </div>
+                <div id="online-result-delta" class="font-orbitron font-black text-2xl"></div>
+            </div>
+            <p id="online-result-note" class="hidden text-xs font-bold text-sky-300 mb-4 z-10"></p>
+
             <!-- VS CPU Series Stats (Hidden by default) -->
             <div id="series-stats" class="w-full hidden flex-col gap-2 mb-6 z-10 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
                 <div class="flex justify-between items-baseline">
@@ -551,6 +595,8 @@
 
             <div class="flex flex-col gap-3 w-full z-10">
 
+                <button id="btn-online-again" onclick="onlineAgain()"
+                    class="hidden w-full bg-blue-600 text-white py-4 rounded-xl font-black text-lg active:scale-95 hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/40"></button>
 
                 <button id="btn-retry-tower" onclick="retryTower()"
                     class="w-full bg-amber-600 text-white py-4 rounded-xl font-black uppercase text-lg active:scale-95 hidden hover:bg-amber-500 transition-all shadow-lg shadow-amber-900/40">Retry
