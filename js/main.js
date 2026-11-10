@@ -410,6 +410,8 @@ function executeCharSelect(id) {
     } else {
         gameState.cChar = JSON.parse(JSON.stringify(selected));
         gameState.cRandomSelect = (id === 'RANDOM');
+        // キャラを選び直したら連戦成績をリセット
+        gameState.series = { wins: 0, losses: 0, draws: 0, history: [] };
         startGame();
     }
 }

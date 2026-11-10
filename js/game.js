@@ -477,6 +477,8 @@ function showFinal(cpuEWin) {
 
     // Tower Mode Result Logic
     const towerStats = document.getElementById('tower-result-stats');
+    const seriesBox = document.getElementById('series-stats');
+    if (gameState.gameMode !== GAME_MODES.NORMAL) { seriesBox?.classList.add('hidden'); seriesBox?.classList.remove('flex'); }
     if (gameState.gameMode === 'tower') {
         if (res === 'VICTORY') {
             towerStats?.classList.add('hidden');
@@ -582,6 +584,7 @@ function showFinal(cpuEWin) {
     } else {
         // Normal Mode
         if (towerStats) towerStats.classList.add('hidden');
+        if (gameState.gameMode === GAME_MODES.NORMAL) recordSeriesResult(res);
     }
 
     lucide.createIcons();
@@ -592,6 +595,53 @@ function showFinal(cpuEWin) {
 }
 
 
+
+// VS CPU 連戦成績を記録して結果画面に表示
+function recordSeriesResult(res) {
+    if (!gameState.series) gameState.series = { wins: 0, losses: 0, draws: 0, history: [] };
+    const sr = gameState.series;
+    if (res === 'VICTORY') sr.wins++;
+    else if (res === 'DEFEAT') sr.losses++;
+    else sr.draws++;
+    sr.history.push({ res, p: gameState.player?.name || '', c: gameState.cpu?.name || '' });
+
+    const box = document.getElementById('series-stats');
+    if (!box) return;
+    const total = sr.wins + sr.losses + sr.draws;
+    // 1戦目は通常の結果表示のみ。2戦目以降に連戦成績を表示
+    if (total < 2) { box.classList.add('hidden'); box.classList.remove('flex'); return; }
+    box.classList.remove('hidden');
+    box.classList.add('flex');
+
+    document.getElementById('series-count').innerText = `${total} MATCHES`;
+    document.getElementById('series-wins').innerText = String(sr.wins);
+    document.getElementById('series-losses').innerText = String(sr.losses);
+    document.getElementById('series-draws').innerText = String(sr.draws);
+    document.getElementById('series-rate').innerText = `${Math.round((sr.wins / total) * 100)}%`;
+
+    // 現在の連勝・連敗
+    let streak = 0;
+    for (let i = sr.history.length - 1; i >= 0 && sr.history[i].res === res; i--) streak++;
+    const streakEl = document.getElementById('series-streak');
+    if (streak >= 2 && res !== 'DRAW') {
+        streakEl.innerText = res === 'VICTORY' ? `🔥 ${streak} 連勝中！` : `${streak} 連敗中…`;
+        streakEl.className = `text-xs font-bold text-center ${res === 'VICTORY' ? 'text-amber-400' : 'text-rose-400'}`;
+    } else {
+        streakEl.innerText = '';
+    }
+
+    // 直近20戦の履歴（古い→新しい）
+    const histEl = document.getElementById('series-history');
+    histEl.innerHTML = '';
+    sr.history.slice(-20).forEach(h => {
+        const chip = document.createElement('span');
+        const color = h.res === 'VICTORY' ? 'bg-emerald-600' : h.res === 'DEFEAT' ? 'bg-rose-600' : 'bg-slate-600';
+        chip.className = `w-6 h-6 rounded text-[10px] font-black font-orbitron flex items-center justify-center text-white ${color}`;
+        chip.innerText = h.res === 'VICTORY' ? 'W' : h.res === 'DEFEAT' ? 'L' : 'D';
+        chip.title = `${h.p} vs ${h.c}`;
+        histEl.appendChild(chip);
+    });
+}
 
 export function proceedAfterVictory() {
     if (!gameState.pendingVictory) return;
