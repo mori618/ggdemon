@@ -1,4 +1,5 @@
 import { CHARACTERS, BOSS_CHARACTERS, TREASURE_MONSTER, ENEMY_TRAITS, PASSIVE_SKILLS, BOSS_INTERVAL } from './constants.js';
+import { getNashStrategy, sampleAction } from './nashAI.js';
 
 /**
  * Battle Charge core game logic.
@@ -215,7 +216,29 @@ export function updateEffects(effects) {
     return { effects: active, expired, totals: calcEffectTotals(active) };
 }
 
+// 直近の CPU の判断根拠（バトルログ用）
+let lastCpuDecision = null;
+export function getLastCpuDecision() { return lastCpuDecision; }
+
 export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMode, floor, cHP, pHP, playerHistory, cpuHistory }) {
+    // MASTER: ゲーム理論（ナッシュ均衡）で手を選ぶ最強AI
+    if (aiLevel === 'MASTER') {
+        const isBound = (cpu.effects || []).some(e => e.type === 'BIND');
+        const forbidden = (isBound && cpuHistory && cpuHistory.length) ? [cpuHistory[cpuHistory.length - 1]] : [];
+        const nash = getNashStrategy({ cpu, player, cHP, cEnergy, pHP, pEnergy, forbidden });
+        if (nash) {
+            const move = sampleAction(nash.strategy);
+            lastCpuDecision = {
+                type: 'NASH', aiLevel: 'MASTER', move, value: nash.value,
+                strategy: nash.strategy, opponentEquilibrium: nash.opponent,
+                playerMoveValues: nash.playerMoveValues, matrix: nash.matrix, forbidden
+            };
+            return move;
+        }
+        // 状態数が多すぎて解けない場合は EXPERT のロジックで代用
+        aiLevel = 'EXPERT';
+    }
+
     const pAtk = player.atk + (player.tempAtk || 0);
     const cAtk = cpu.atk + (cpu.tempAtk || 0);
     const cGrdC = Math.max(0, cpu.grdC + (cpu.tempGrdC || 0));
@@ -295,6 +318,8 @@ export function getCpuMoveLogic({ player, cpu, pEnergy, cEnergy, aiLevel, gameMo
         if (cpu.atk >= 4 && weights.ATTACK > 0) weights.ATTACK += (20 + boost);
         if (cpu.grdC === 0 && weights.GUARD > 0) weights.GUARD += (20 + boost);
     }
+
+    lastCpuDecision = { type: 'HEURISTIC', aiLevel: level, weights: { ...weights } };
 
     let pool = [];
     Object.keys(weights).forEach(move => {

@@ -3,6 +3,22 @@
 ## 概要 (Overview)
 「Battle Charge」は、エネルギー管理と読み合いが鍵となるターン制戦略バトルゲームです。
 
+## CPU: MASTER（ゲーム理論AI）
+フリーバトルのCPU選択で **MASTER** を選ぶと、CPUがナッシュ均衡の混合戦略で手を選びます（`js/nashAI.js`）。
+局面 (HP, エネルギー) ごとに同時手番ゲームを解き、Shapley の値反復で全体の均衡を求めています。
+
+## バトルログ
+全モードで、1戦ごとに全ターンの局面・両者の行動・CPUの判断根拠（MASTERなら均衡戦略と期待値）・結果を記録します。
+* 結果画面の **Download Battle Log (JSON)**: 直前の1戦をダウンロード
+* タイトル画面の **Battle Logs (JSON)**: 保存済みの全バトル（最大100戦、ブラウザのlocalStorage）をまとめてダウンロード
+
+ダウンロードしたログは解析スクリプトで集計できます。
+```bash
+npm run analyze-logs -- battle-logs-all-XXXX.json          # 読みやすいレポート
+npm run analyze-logs -- --json battle-logs-all-XXXX.json   # 集計をJSONで出力
+```
+勝率、局面別のプレイヤーの手の傾向、直前の手からの遷移、MASTER戦での「均衡から見た損失」と「読まれリスク」を出力します。
+
 ## タワーモード (Tower Mode)
 HPを引き継いで塔を登るサバイバルモード。
 
