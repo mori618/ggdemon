@@ -197,6 +197,19 @@ window.retryGame = () => {
     if (gameState.isPaused) window.togglePause();
 };
 
+// VS CPU: 同じ組み合わせでもう一度対戦（ランダム選択していた側は再抽選）
+window.rematchGame = () => {
+    const pickRandom = () => JSON.parse(JSON.stringify(CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]));
+    if (gameState.pRandomSelect) gameState.pChar = pickRandom();
+    if (gameState.cRandomSelect) gameState.cChar = pickRandom();
+
+    const ov = document.getElementById('result-overlay');
+    ov.classList.add('hidden');
+    ov.classList.remove('opacity-100');
+    sound.playSE('ready');
+    setupBattleState();
+};
+
 window.restartApp = () => {
     document.getElementById('result-overlay').classList.add('hidden');
     document.getElementById('pause-overlay').classList.add('hidden');
@@ -383,6 +396,7 @@ function executeCharSelect(id) {
 
     if (gameState.selectionState === 'PLAYER') {
         gameState.pChar = JSON.parse(JSON.stringify(selected));
+        gameState.pRandomSelect = (id === 'RANDOM');
         if (gameState.gameMode === GAME_MODES.TOWER) {
             // タワーモードの場合は難易度選択を表示
             document.getElementById('select-screen').classList.add('hidden');
@@ -395,6 +409,7 @@ function executeCharSelect(id) {
         }
     } else {
         gameState.cChar = JSON.parse(JSON.stringify(selected));
+        gameState.cRandomSelect = (id === 'RANDOM');
         startGame();
     }
 }

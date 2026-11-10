@@ -470,6 +470,9 @@ function showFinal(cpuEWin) {
     tit.className = `text-5xl font-black italic font-orbitron mb-2 uppercase tracking-tighter drop-shadow-lg z-10 ${res === 'VICTORY' ? 'text-emerald-400' : res === 'DEFEAT' ? 'text-rose-500' : 'text-white'}`;
 
     retryB?.classList.add('hidden');
+    const rematchB = document.getElementById('btn-rematch');
+    if (gameState.gameMode === GAME_MODES.NORMAL) rematchB?.classList.remove('hidden');
+    else rematchB?.classList.add('hidden');
     streakB?.classList.add('hidden'); // Legacy container
 
     // Tower Mode Result Logic
