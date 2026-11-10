@@ -533,12 +533,32 @@
                 </div>
             </div>
 
+            <!-- VS CPU Series Stats (Hidden by default) -->
+            <div id="series-stats" class="w-full hidden flex-col gap-2 mb-6 z-10 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                <div class="flex justify-between items-baseline">
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Series</span>
+                    <span id="series-count" class="text-[10px] text-slate-400 font-bold font-orbitron"></span>
+                </div>
+                <div class="flex justify-center items-end gap-4 font-orbitron font-black">
+                    <div class="flex flex-col items-center"><span id="series-wins" class="text-3xl text-emerald-400">0</span><span class="text-[10px] text-slate-500">WIN</span></div>
+                    <div class="flex flex-col items-center"><span id="series-losses" class="text-3xl text-rose-500">0</span><span class="text-[10px] text-slate-500">LOSE</span></div>
+                    <div class="flex flex-col items-center"><span id="series-draws" class="text-3xl text-slate-300">0</span><span class="text-[10px] text-slate-500">DRAW</span></div>
+                    <div class="flex flex-col items-center"><span id="series-rate" class="text-3xl text-amber-400">0%</span><span class="text-[10px] text-slate-500">RATE</span></div>
+                </div>
+                <div id="series-streak" class="text-xs font-bold text-center"></div>
+                <div id="series-history" class="flex flex-wrap gap-1 justify-center"></div>
+            </div>
+
             <div class="flex flex-col gap-3 w-full z-10">
 
 
                 <button id="btn-retry-tower" onclick="retryTower()"
                     class="w-full bg-amber-600 text-white py-4 rounded-xl font-black uppercase text-lg active:scale-95 hidden hover:bg-amber-500 transition-all shadow-lg shadow-amber-900/40">Retry
                     Tower</button>
+
+                <button id="btn-rematch" onclick="rematchGame()"
+                    class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase text-lg active:scale-95 hidden hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/40">Rematch
+                    / もう一度</button>
 
                 <button id="btn-download-log" onclick="downloadBattleLog()"
                     class="w-full bg-slate-900 border border-slate-700 text-sky-300 py-3 rounded-xl font-bold uppercase text-sm active:scale-95 hover:bg-slate-800 transition-all">Download
