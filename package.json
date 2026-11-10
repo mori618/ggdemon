@@ -8,7 +8,8 @@
     "build": "vite build",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "test": "vitest"
+    "test": "vitest",
+    "analyze-logs": "node scripts/analyze-logs.mjs"
   },
   "keywords": [],
   "author": "",

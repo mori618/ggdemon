@@ -2,7 +2,8 @@ import { CHARACTERS, ENEMY_TRAITS, BOSS_CHARACTERS, SKILLS, ITEM_EFFECTS, TREASU
 import { gameState, saveHighStreak, saveGameState, clearGameState } from './utils.js';
 import { sound } from './sounds.js';
 import { setMessage, updateUI, initEnergy, showPassiveAlert, showDamageNumber, showActionAnim } from './ui.js';
-import { calculateTurnResult, updateEffects, calcEffectTotals, getCpuMoveLogic, generateTowerEnemy, isBossFloor } from './logic.js';
+import { calculateTurnResult, updateEffects, calcEffectTotals, getCpuMoveLogic, getLastCpuDecision, generateTowerEnemy, isBossFloor } from './logic.js';
+import { startBattleLog, getCurrentLog, beginTurnLog, addTurnStep, finishTurnLog, markRevived, endBattleLog } from './battleLog.js';
 
 const bumpAiLevel = (lv, dir) => {
     const order = ['EASY', 'NORMAL', 'HARD', 'EXPERT'];
@@ -144,6 +145,8 @@ export function setupBattleState() {
     gameState.pEnergy = gameState.player.startE;
     gameState.cEnergy = gameState.cpu.startE;
     gameState.turn = 1; gameState.selectedCmd = null; gameState.isProc = false; gameState.gameOver = false;
+    gameState.lastCpuDecision = null;
+    startBattleLog(gameState);
 
     document.getElementById('player-name-label').innerText = gameState.player.name;
     document.getElementById('cpu-name-label').innerText = gameState.cpu.name;
@@ -166,7 +169,7 @@ export function setupBattleState() {
 }
 
 export function getCpuMove() {
-    return getCpuMoveLogic({
+    const move = getCpuMoveLogic({
         player: gameState.player,
         cpu: gameState.cpu,
         pEnergy: gameState.pEnergy,
@@ -180,6 +183,8 @@ export function getCpuMove() {
         cpuHistory: gameState.cpuHistory
 
     });
+    gameState.lastCpuDecision = getLastCpuDecision();
+    return move;
 }
 
 function tickEffects() {
@@ -220,6 +225,8 @@ function tickEffects() {
 
 export function executeTurn(pM, cM) {
     const isDouble = gameState.player.effects.some(e => e.type === 'DOUBLE_ACTION');
+    const turnLog = beginTurnLog(gameState, pM, cM, gameState.lastCpuDecision);
+    gameState.lastCpuDecision = null;
 
     gameState.playerHistory.push(pM);
     if (gameState.playerHistory.length > 5) gameState.playerHistory.shift();
@@ -273,6 +280,8 @@ export function executeTurn(pM, cM) {
                 { ...gameState.cpu, energy: gameState.cEnergy, hp: gameState.cHP },
                 pM, currentCM, gameState.playerSkill
             );
+
+            addTurnStep(turnLog, currentCM, result);
 
             // Sound effects & Interaction Animations
             let pAnim = pM, cAnim = currentCM;
@@ -379,6 +388,7 @@ export function executeTurn(pM, cM) {
         }
 
         tickEffects();
+        finishTurnLog(turnLog, gameState);
         gameState.pendingTurn = null;
 
         updateUI();
@@ -391,6 +401,7 @@ export function executeTurn(pM, cM) {
             if (gameState.pHP <= 0 && gameState.gameMode === 'tower' && gameState.lives > 0) {
                 gameState.lives--;
                 gameState.pHP = gameState.player.hp; // Recover to Max
+                markRevived(turnLog, gameState.lives);
                 sound.playSE('charge'); // Revival sound
 
                 // Visual feedback
@@ -451,6 +462,8 @@ function showFinal(cpuEWin) {
     else if (gameState.pHP <= 0) { res = "DEFEAT"; d = "HP EXHAUSTED"; sound.playSE('defeat'); }
     else if (gameState.pEnergy >= gameState.player.winE) { res = "VICTORY"; d = "CHARGED UP"; sound.playSE('victory'); }
     else if (cpuEWin) { res = "DEFEAT"; d = "CPU CHARGED UP"; sound.playSE('defeat'); }
+
+    endBattleLog(gameState, res, d);
 
     tit.innerText = res;
     desc.innerText = d;
@@ -2048,6 +2061,12 @@ export function showShop(isDiscount = false) {
 export function resumeGame() {
     // UIを初期化
     if (gameState.inBattle) {
+        // 途中から再開したバトルも記録する（開始時点の局面は再開時点のもの）
+        if (!getCurrentLog()) {
+            const log = startBattleLog(gameState);
+            log.resumed = true;
+            log.resumedAtTurn = gameState.turn;
+        }
         document.getElementById('select-screen').classList.add('hidden');
         document.getElementById('title-screen').classList.add('hidden');
         document.getElementById('online-screen').classList.add('hidden');

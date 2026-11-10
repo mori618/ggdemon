@@ -1,4 +1,5 @@
 import { CHARACTERS, GAME_MODES, NETWORK_EVENTS, BOSS_CHARACTERS } from './constants.js';
+import { downloadLastLog, downloadAllLogs } from './battleLog.js';
 import { sound } from './sounds.js';
 import { gameState, loadHighStreak, Deck, hasSaveData, loadGameState, clearGameState, saveGameState } from './utils.js';
 import { syncAudioUI, renderChars, updateUI, showCommandDetail, setMessage } from './ui.js';
@@ -157,6 +158,16 @@ window.goToSelection = (mode) => {
     document.getElementById('difficulty-selector').classList.add('hidden');
     document.getElementById('select-title').innerText = "Select Your Hero";
     renderChars(handleCharSelect);
+};
+
+window.downloadBattleLog = () => {
+    sound.playSE('click');
+    if (!downloadLastLog()) alert('まだバトルログがありません');
+};
+
+window.downloadAllBattleLogs = () => {
+    sound.playSE('click');
+    if (!downloadAllLogs()) alert('まだバトルログがありません');
 };
 
 window.setAiLevel = (lv) => {

@@ -283,10 +283,15 @@ export function getNashStrategy({ cpu, player, cHP, cEnergy, pHP, pEnergy, forbi
         return tv !== null ? tv : (entry.V.get(t.join(',')) ?? 0);
     }));
     const { value, row, col } = solveMatrixGame(M);
-    const strategy = {}, opponent = {};
+    const strategy = {}, opponent = {}, playerMoveValues = {};
     ra.forEach((a, i) => { strategy[a] = row[i]; });
-    rb.forEach((b, j) => { opponent[b] = col[j]; });
-    return { value, strategy, opponent };
+    rb.forEach((b, j) => {
+        opponent[b] = col[j];
+        // CPU が均衡戦略を取ったとき、プレイヤーがこの手を選んだ場合の CPU 期待値
+        playerMoveValues[b] = ra.reduce((sum, _, i) => sum + row[i] * M[i][j], 0);
+    });
+    const matrix = { rows: ra, cols: rb, values: M };
+    return { value, strategy, opponent, playerMoveValues, matrix };
 }
 
 /** 混合戦略から1手を抽選する。 */
